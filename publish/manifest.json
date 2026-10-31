@@ -1,0 +1,26 @@
+{
+  "item": {
+    "name": "点记",
+    "icon": "logo-100.png",
+    "description": "手环上的对局计分板。\n上下双色分区，单击 +1、双击 -1，带短震反馈；比分自动记住，退出重进不丢；上滑二次确认归零。\n适合台球、乒乓、棋牌、羽毛球等面对面对局。",
+    "source_url": "",
+    "preview": [
+      "cover.png"
+    ],
+    "author": [
+      {
+        "name": "TapTally"
+      }
+    ]
+  },
+  "downloads": {
+    "n66": {
+      "version": "1.0.0",
+      "file_name": "com.taptally.scoreboard.release.1.0.0.rpk"
+    },
+    "xmb9": {
+      "version": "1.0.0",
+      "file_name": "com.taptally.scoreboard.release.1.0.0.rpk"
+    }
+  }
+}

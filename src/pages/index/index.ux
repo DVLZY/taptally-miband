@@ -1,0 +1,314 @@
+<template>
+  <div class="root" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="half halfTop" onclick="onTop" onlongpress="onTopLong">
+      <text class="score scoreTop">{{top}}</text>
+    </div>
+    <div class="bar">
+      <text class="tip">{{bar}}</text>
+    </div>
+    <div class="half halfBottom" onclick="onBottom" onlongpress="onBottomLong">
+      <text class="score scoreBottom">{{bottom}}</text>
+    </div>
+  </div>
+</template>
+
+<script>
+import vibrator from '@system.vibrator'
+import storage from '@system.storage'
+import router from '@system.router'
+
+const STORE_KEY = 'taptally_v1'
+
+// 兼容 success 回调的多种形态：原始字符串 / {value} / {data}
+function pickValue(data) {
+  if (data === undefined || data === null) return null
+  if (typeof data === 'string') return data
+  if (typeof data === 'object') {
+    if (data.value !== undefined && data.value !== null) return String(data.value)
+    if (data.data !== undefined && data.data !== null) return String(data.data)
+    if (data.key !== undefined) return null
+    try {
+      return JSON.stringify(data)
+    } catch (e) {
+      return null
+    }
+  }
+  return String(data)
+}
+
+function coord(evt) {
+  let t = evt
+  if (evt && evt.touches && evt.touches.length) t = evt.touches[0]
+  else if (evt && evt.changedTouches && evt.changedTouches.length) t = evt.changedTouches[0]
+  if (!t) return null
+  let x = t.clientX
+  if (x === undefined || x === null) x = t.pageX
+  if (x === undefined || x === null) x = t.offsetX
+  let y = t.clientY
+  if (y === undefined || y === null) y = t.pageY
+  if (y === undefined || y === null) y = t.offsetY
+  if (x === undefined || x === null || y === undefined || y === null) return null
+  return { x: x, y: y }
+}
+
+export default {
+  private: {
+    top: '0',
+    bottom: '0',
+    tip: '重置',
+    dbg: '',
+    bar: '重置',
+    pendingSide: '',
+    armed: false
+  },
+
+  onReady() {
+    const that = this
+    this.pendingTimer = 0
+    this.armTimer = 0
+    this.startPoint = null
+    this.setBar('R...')
+    try {
+      storage.get({
+        key: STORE_KEY,
+        success: function (data) {
+          const v = pickValue(data)
+          that.dbg = 'R:' + (v === null ? 'null' : v)
+          that.setBar(that.dbg)
+          that.applySaved(v)
+        },
+        fail: function (data, code) {
+          that.dbg = 'R:fail' + code
+          that.setBar(that.dbg)
+        }
+      })
+    } catch (e) {
+      this.setBar('R:throw')
+    }
+  },
+
+  onDestroy() {
+    if (this.pendingTimer) clearTimeout(this.pendingTimer)
+    if (this.armTimer) clearTimeout(this.armTimer)
+  },
+
+  setBar(s) {
+    this.bar = s
+  },
+
+  // ---------- 持久化 ----------
+  applySaved(v) {
+    if (!v) return
+    const parts = String(v).split('-')
+    if (parts.length !== 2) return
+    const t = parseInt(parts[0], 10)
+    const b = parseInt(parts[1], 10)
+    if (isNaN(t) || isNaN(b)) return
+    const that = this
+    const apply = function () {
+      that.top = String(t < 0 ? 0 : t)
+      that.bottom = String(b < 0 ? 0 : b)
+    }
+    apply()
+    // 防止框架初始化数据覆盖异步回调写入
+    setTimeout(apply, 60)
+  },
+
+  save() {
+    const that = this
+    try {
+      storage.set({
+        key: STORE_KEY,
+        value: this.top + '-' + this.bottom,
+        success: function () {
+          that.setBar(that.dbg + ' W:ok')
+        },
+        fail: function (data, code) {
+          that.setBar(that.dbg + ' W:fail' + code)
+        }
+      })
+    } catch (e) {
+      this.setBar(this.dbg + ' W:throw')
+    }
+  },
+
+  // ---------- 基础能力 ----------
+  buzz(mode) {
+    try {
+      vibrator.vibrate({ mode: mode || 'short' })
+    } catch (e) {}
+  },
+
+  buzzDouble() {
+    const that = this
+    this.buzz('short')
+    setTimeout(function () {
+      that.buzz('short')
+    }, 130)
+  },
+
+  num(v) {
+    const n = parseInt(v, 10)
+    return isNaN(n) ? 0 : n
+  },
+
+  add(side) {
+    const cur = this.num(this[side])
+    if (cur >= 199) return
+    this[side] = String(cur + 1)
+    this.buzz('short')
+    this.save()
+  },
+
+  minus(side) {
+    const cur = this.num(this[side])
+    if (cur <= 0) {
+      this.buzz('short')
+      return
+    }
+    this[side] = String(cur - 1)
+    this.buzzDouble()
+    this.save()
+  },
+
+  tap(side) {
+    const that = this
+    if (this.pendingTimer && this.pendingSide === side) {
+      clearTimeout(this.pendingTimer)
+      this.pendingTimer = 0
+      this.pendingSide = ''
+      this.minus(side)
+      return
+    }
+    if (this.pendingTimer) {
+      clearTimeout(this.pendingTimer)
+      this.pendingTimer = 0
+      const prev = this.pendingSide
+      this.pendingSide = ''
+      if (prev) this.add(prev)
+    }
+    this.pendingSide = side
+    this.pendingTimer = setTimeout(function () {
+      that.pendingTimer = 0
+      const s = that.pendingSide
+      that.pendingSide = ''
+      if (s) that.add(s)
+    }, 300)
+  },
+
+  onTop(evt) {
+    this.tap('top')
+  },
+
+  onBottom(evt) {
+    this.tap('bottom')
+  },
+
+  onTopLong(evt) {
+    this.minus('top')
+  },
+
+  onBottomLong(evt) {
+    this.minus('bottom')
+  },
+
+  // ---------- 上滑重置（二次确认）----------
+  resetFlow() {
+    const that = this
+    if (!this.armed) {
+      this.armed = true
+      this.tip = '再滑确认'
+      this.setBar('再滑确认')
+      this.buzz('short')
+      this.armTimer = setTimeout(function () {
+        that.armed = false
+        that.tip = '重置'
+        that.setBar(that.dbg || '重置')
+        that.armTimer = 0
+      }, 2500)
+      return
+    }
+    if (this.armTimer) clearTimeout(this.armTimer)
+    this.armTimer = 0
+    this.armed = false
+    this.top = '0'
+    this.bottom = '0'
+    this.buzzDouble()
+    this.save()
+    this.setBar(that.dbg || '重置')
+  },
+
+  // ---------- 手势 ----------
+  onTouchStart(evt) {
+    this.startPoint = coord(evt)
+  },
+
+  onTouchEnd(evt) {
+    const start = this.startPoint
+    this.startPoint = null
+    const end = coord(evt)
+    if (!start || !end) return
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    if (dx > 90 && Math.abs(dy) < 90) {
+      try {
+        router.back()
+      } catch (e) {}
+      return
+    }
+    if (dy < -90 && Math.abs(dx) < 90) {
+      this.resetFlow()
+    }
+  }
+}
+</script>
+
+<style>
+.root {
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: #000000;
+}
+
+.half {
+  height: 48%;
+  align-items: center;
+  justify-content: center;
+}
+
+.halfTop {
+  background-color: #a8e6cf;
+}
+
+.halfBottom {
+  background-color: #b3e5fc;
+}
+
+.score {
+  font-size: 300px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.scoreTop {
+  color: #0b6b4f;
+}
+
+.scoreBottom {
+  color: #0b4f6b;
+}
+
+.bar {
+  height: 4%;
+  align-items: center;
+  justify-content: center;
+  background-color: #101a1e;
+}
+
+.tip {
+  font-size: 26px;
+  color: #7ee0c0;
+  text-align: center;
+}
+</style>

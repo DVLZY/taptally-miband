@@ -1,0 +1,18 @@
+<script>
+import brightness from '@system.brightness'
+
+export default {
+  onCreate() {
+    // 应用启动时开启屏幕常亮
+    brightness.setKeepScreenOn({
+      keepScreenOn: true
+    })
+  },
+  onDestroy() {
+    // 应用退出时释放常亮
+    brightness.setKeepScreenOn({
+      keepScreenOn: false
+    })
+  }
+}
+</script>

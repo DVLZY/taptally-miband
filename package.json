@@ -1,0 +1,16 @@
+{
+  "name": "taptally",
+  "version": "1.0.0",
+  "description": "点记 TapTally - 小米手环9 对局计分",
+  "engines": {
+    "node": ">=8.10"
+  },
+  "scripts": {
+    "build": "aiot build --enable-jsc",
+    "release": "aiot release --enable-jsc"
+  },
+  "devDependencies": {
+    "@aiot-toolkit/jsc": "^1.0.3",
+    "aiot-toolkit": "^2.0.5"
+  }
+}
