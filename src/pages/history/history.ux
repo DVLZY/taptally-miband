@@ -2,6 +2,7 @@
   <div class="root" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="head">
       <text class="title" style="font-size: {{titleFs}}px" onlongpress="onTitleLong">记录</text>
+      <text class="dbg" style="font-size: {{dbgFs}}px">{{dbg}}</text>
     </div>
     <scroll class="list" scroll-y="true">
       <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
@@ -63,6 +64,7 @@ function metricsOf(w, h, shape) {
     valFs: Math.round(itemH * 0.66),
     noFs: Math.max(20, Math.round(itemH * 0.40)),
     titleFs: Math.max(24, Math.round(dh * 0.036)),
+    dbgFs: Math.max(40, Math.round(dh * 0.046)),
     footFs: Math.max(26, Math.round(dh * 0.026)),
     accentW: accentW,
     accentMl: accentMl,
@@ -82,6 +84,8 @@ export default {
     valFs: 83,
     noFs: 50,
     titleFs: 44,
+    dbgFs: 56,
+    dbg: '',
     accentW: 9,
     accentMl: 8,
     accentMr: 25,
@@ -133,6 +137,7 @@ export default {
     this.valFs = m.valFs
     this.noFs = m.noFs
     this.titleFs = m.titleFs
+    this.dbgFs = m.dbgFs
     this.accentW = m.accentW
     this.accentMl = m.accentMl
     this.accentMr = m.accentMr
@@ -145,7 +150,7 @@ export default {
   // S/F = 偏好存储 / 文件里读到多少字符（null 表示读不到），N = 内存里几条
   onTitleLong() {
     this.buzz('short')
-    this.foot = '单击恢复 / 长按删除'
+    this.dbg = 'v' + APP_VERSION
   },
 
   // 时间降序：最新的一局在最上面
@@ -170,7 +175,7 @@ export default {
       that.empty = rows.length === 0
       // 诊断常显：S/F = 偏好存储与文件里读到多少字符，L = 追加日志字符数，N = 内存条数
       debugStats(function (st) {
-        that.foot = 'S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
+        that.dbg = 'S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
       })
     })
   },
@@ -260,8 +265,8 @@ export default {
 }
 
 .head {
-  height: 10%;
-  flex-direction: row;
+  height: 18%;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -272,8 +277,14 @@ export default {
   text-align: center;
 }
 
+.dbg {
+  color: #7fd9b7;
+  font-weight: bold;
+  text-align: center;
+}
+
 .list {
-  height: 78%;
+  height: 72%;
 }
 
 .item {
@@ -324,7 +335,7 @@ export default {
 }
 
 .foot {
-  height: 12%;
+  height: 10%;
   align-items: center;
   justify-content: center;
 }
