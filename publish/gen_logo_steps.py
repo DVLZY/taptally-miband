@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 import gen_assets as ga
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STEPS = [(0.15, "70%  1.6.6"), (0.10, "80%  本版"), (0.05, "90%  偏大")]
+STEPS = [(0.15, "70%  1.6.6"), (0.10, "80%  1.6.7"), (0.075, "85%  本版"), (0.05, "90%  上限")]
 TILE = 180
 LABEL_H = 76
 W = 60 + len(STEPS) * (TILE + 40)
