@@ -32,27 +32,35 @@ def rounded(size, radius, fill):
     return img
 
 
-def make_logo(size):
-    """深色圆角底 + 上半浅绿 0 / 下半浅蓝 9。"""
-    S = size
-    img = rounded(S, int(S * 0.24), DARK)
-    d = ImageDraw.Draw(img)
-    pad = int(S * 0.13)
-    gap = max(1, int(S * 0.035))
-    r = int(S * 0.11)
-    top = [pad, pad, S - pad, S // 2 - gap // 2 - 1]
-    bot = [pad, S // 2 + gap // 2 + 1, S - pad, S - pad]
-    d.rounded_rectangle(top, radius=r, fill=GREEN)
-    d.rounded_rectangle(bot, radius=r, fill=BLUE)
+def make_logo(size, ss=4):
+    """圆形图标：整圆上绿下蓝、中间深色分隔，圆形安全区内放 0 / 9。
 
-    font = ImageFont.truetype(FONT_B, int(S * 0.34))
-    for txt, box, color in (("0", top, GREEN_TXT), ("9", bot, BLUE_TXT)):
+    手环 9 的应用图标是圆形裁切的，所以图形必须自己就是圆形，
+    并且所有内容都落在圆内（直径上留 ~6% 边距），裁切后不会缺角。
+    """
+    S = size * ss
+    inner = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    di = ImageDraw.Draw(inner)
+    gap = max(2, int(S * 0.048))
+    di.rectangle([0, 0, S, S // 2 - gap // 2], fill=GREEN)
+    di.rectangle([0, S // 2 + gap // 2, S, S], fill=BLUE)
+    di.rectangle([0, S // 2 - gap // 2 - 1, S, S // 2 + gap // 2], fill=(14, 20, 24, 255))
+
+    mask = Image.new("L", (S, S), 0)
+    pad = int(S * 0.01)
+    ImageDraw.Draw(mask).ellipse([pad, pad, S - 1 - pad, S - 1 - pad], fill=255)
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    img.paste(inner, (0, 0), mask)
+
+    d = ImageDraw.Draw(img)
+    font = ImageFont.truetype(FONT_B, int(S * 0.365))
+    for txt, cy, color in (("0", 0.272, GREEN_TXT), ("9", 0.728, BLUE_TXT)):
         bb = d.textbbox((0, 0), txt, font=font)
         w, h = bb[2] - bb[0], bb[3] - bb[1]
-        cx = (box[0] + box[2]) / 2 - w / 2 - bb[0]
-        cy = (box[1] + box[3]) / 2 - h / 2 - bb[1]
-        d.text((cx, cy), txt, font=font, fill=color)
-    return img
+        x = (S - w) / 2 - bb[0]
+        y = S * cy - h / 2 - bb[1]
+        d.text((x, y), txt, font=font, fill=color)
+    return img.resize((size, size), Image.LANCZOS)
 
 
 def band_mock(W, H):
