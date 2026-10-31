@@ -23,7 +23,7 @@ const VER_SEP = '|'
 export const MAX_RECORDS = 5
 
 // 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
-export const APP_VERSION = '1.6.4'
+export const APP_VERSION = '1.6.5'
 
 // 内存缓存
 let scoreCache = null // { t, b }
@@ -250,12 +250,17 @@ export function saveRecords(list) {
   flush()
 }
 
-// 新增一条：只改内存 + 落盘，**不再回读合并**（回读会把刚删掉的条目捞回来）
+// 新增一条：**先强制回读磁盘拿到最新列表**，再追加并落盘。
+// 为什么必须回读：Vela 里每个页面各自持有一份模块实例（各自的内存缓存），
+// 记分页的缓存还停留在「删除之前」的 5 条；若直接用它写回，删掉的条目就会被写回去。
+// 回读按版本戳取最新那份，所以晚写的删除结果一定赢。
 export function addRecord(t, b, cb) {
   const entry = { t: t, b: b, ts: now() }
-  recordCache = normalize([[entry], recordCache || []])
-  flush()
-  if (cb) cb(clone(recordCache))
+  loadRecords(function (list) {
+    recordCache = normalize([[entry], list || []])
+    flush()
+    if (cb) cb(clone(recordCache))
+  }, true)
 }
 
 // 删除第 idx 条：直接在缓存上删，然后整份重写
@@ -269,8 +274,7 @@ export function removeRecord(idx, cb) {
     saveRecords(list)
     if (cb) cb(clone(recordCache || list))
   }
-  if (recordCache) run(clone(recordCache))
-  else loadRecords(run, true)
+  loadRecords(run, true)
 }
 
 // 诊断：两通道字符数 + 版本戳 + 内存条数
