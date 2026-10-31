@@ -49,7 +49,7 @@ def vgrad_circle(size, c_top, c_bot):
     return base.resize((size, size), Image.BILINEAR)
 
 
-def make_logo(size, ss=4, digit_fs=0.400, cy_top=0.322, cy_bot=0.678):
+def make_logo(size, ss=4, digit_fs=0.400, cx_top=0.418, cy_top=0.318, cx_bot=0.582, cy_bot=0.682):
     """圆形图标：上绿下蓝**渐变**背景（无分隔线），0 在上、9 在下，数字大而靠拢。
 
     手环列表按圆形裁切，所以图形本身画成圆；数字全部落在圆内安全区。
@@ -65,10 +65,11 @@ def make_logo(size, ss=4, digit_fs=0.400, cy_top=0.322, cy_bot=0.678):
 
     d = ImageDraw.Draw(img)
     font = ImageFont.truetype(FONT_B, int(S * digit_fs))
-    for txt, cy, color in (("0", cy_top, GREEN_TXT), ("9", cy_bot, BLUE_TXT)):
+    # 0 偏左上、9 偏右下：斜向错开，避免两个数字顶在一起
+    for txt, cx, cy, color in (("0", cx_top, cy_top, GREEN_TXT), ("9", cx_bot, cy_bot, BLUE_TXT)):
         bb = d.textbbox((0, 0), txt, font=font)
         w, h = bb[2] - bb[0], bb[3] - bb[1]
-        d.text((S * 0.5 - w / 2 - bb[0], S * cy - h / 2 - bb[1]), txt, font=font, fill=color)
+        d.text((S * cx - w / 2 - bb[0], S * cy - h / 2 - bb[1]), txt, font=font, fill=color)
     return img.resize((size, size), Image.LANCZOS)
 
 
