@@ -1,12 +1,12 @@
 <template>
-  <div class="root" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="card cardTop" onclick="onTop" onlongpress="onTopLong">
+  <div class="root" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="card cardTop" style="border-radius: {{radius}}px" onclick="onTop" onlongpress="onTopLong">
       <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
-    <div class="mid">
-      <text class="midText">{{mid}}</text>
+    <div class="mid" onlongpress="onMidLong">
+      <text class="midText" style="font-size: {{midFs}}px">{{mid}}</text>
     </div>
-    <div class="card cardBot" onclick="onBottom" onlongpress="onBottomLong">
+    <div class="card cardBot" style="border-radius: {{radius}}px" onclick="onBottom" onlongpress="onBottomLong">
       <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
     </div>
   </div>
@@ -15,8 +15,10 @@
 <script>
 import vibrator from '@system.vibrator'
 import router from '@system.router'
+import device from '@system.device'
 import { loadScore, saveScore, addRecord, consumeScoreRefresh } from '../../common/store.js'
 
+const DESIGN_W = 480
 let bootScore = null
 
 function coord(evt) {
@@ -34,12 +36,30 @@ function coord(evt) {
   return { x: x, y: y }
 }
 
+// 由屏幕宽高推出「设计高度」，再据此算卡片与字号：
+// 任何比例的屏幕（手环 192x490、9 Pro 336x480、圆表 466x466…）都能自适应
+function metricsOf(w, h, shape) {
+  const dw = DESIGN_W
+  const dh = dw * h / w
+  let pad = 14
+  if (shape === 'circle') pad = Math.round(dw * 0.1465)
+  else if (shape === 'pill-shaped') pad = 18
+  const gap = Math.round(dh * 0.04)
+  const cardH = (dh - pad * 2 - gap) / 2
+  const cardW = dw - pad * 2
+  const radius = shape === 'rect' ? 52 : Math.round(cardH / 2)
+  return { dh: dh, pad: pad, cardH: cardH, cardW: cardW, radius: radius }
+}
+
 export default {
   private: {
     top: '0',
     bottom: '0',
-    fsTop: 400,
-    fsBot: 400,
+    fsTop: 362,
+    fsBot: 425,
+    pad: 14,
+    radius: 52,
+    midFs: 24,
     mid: '',
     armed: false
   },
@@ -50,6 +70,9 @@ export default {
     this.startPoint = null
     this.restored = false
     this.touched = false
+    // 手环 9 的默认值，拿到真实设备信息后再覆盖
+    this.metrics = metricsOf(192, 490, 'rect')
+    this.midFs = Math.max(18, Math.round(this.metrics.dh * 0.0196))
     if (bootScore) {
       this.restored = true
       this.applyScore(bootScore.t, bootScore.b, false)
@@ -57,10 +80,10 @@ export default {
   },
 
   onReady() {
+    this.syncDevice()
     this.restore()
   },
 
-  // 从列表页恢复或从后台回来时重新读一次
   onShow() {
     if (!this.restored || consumeScoreRefresh()) {
       this.restored = false
@@ -76,6 +99,44 @@ export default {
     this.saveNow()
     if (this.pendingTimer) clearTimeout(this.pendingTimer)
     if (this.armTimer) clearTimeout(this.armTimer)
+  },
+
+  // 中间横条长按：显示屏幕参数，便于在未适配机型上确认分辨率/形状
+  onMidLong() {
+    const that = this
+    const m = this.metrics || {}
+    this.mid = (this.devW || '?') + 'x' + (this.devH || '?') + ' ' + (this.devShape || '?')
+    this.buzz('short')
+    if (this.armTimer) clearTimeout(this.armTimer)
+    this.armTimer = setTimeout(function () {
+      that.mid = ''
+      that.armTimer = 0
+    }, 3000)
+  },
+
+  // ---------- 屏幕自适应 ----------
+  syncDevice() {
+    const that = this
+    try {
+      device.getInfo({
+        success: function (ret) {
+          if (!ret || !ret.screenWidth || !ret.screenHeight) return
+          that.applyMetrics(ret.screenWidth, ret.screenHeight, ret.screenShape)
+        },
+        fail: function () {}
+      })
+    } catch (e) {}
+  },
+
+  applyMetrics(w, h, shape) {
+    this.devW = w
+    this.devH = h
+    this.devShape = shape || 'rect'
+    this.metrics = metricsOf(w, h, shape)
+    this.pad = this.metrics.pad
+    this.radius = this.metrics.radius
+    this.midFs = Math.max(18, Math.round(this.metrics.dh * 0.0196))
+    this.syncFont()
   },
 
   // ---------- 读取 / 应用 ----------
@@ -103,7 +164,6 @@ export default {
     }
     apply()
     if (defer) {
-      // 防止框架用初始值重绘把异步恢复的结果盖掉
       setTimeout(function () {
         if (!that.touched) apply()
       }, 150)
@@ -141,11 +201,14 @@ export default {
     return isNaN(n) ? 0 : n
   },
 
-  // 数字越大字越大；3 位数收小，避免溢出卡片
+  // 字号同时受卡片宽、卡片高约束：位数越多越小，屏幕越矮越小
   sizeFor(n) {
-    if (n >= 100) return 210
-    if (n >= 10) return 350
-    return 400
+    const d = String(n).length
+    const m = this.metrics || metricsOf(192, 490, 'rect')
+    const byWidth = m.cardW / (0.60 * d) * 0.96
+    const byHeight = m.cardH * 0.74
+    const f = Math.min(byWidth, byHeight, 430)
+    return Math.round(f < 24 ? 24 : f)
   },
 
   syncFont() {
@@ -292,7 +355,6 @@ export default {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  padding: 14px;
   background-color: #070e12;
 }
 
@@ -301,7 +363,6 @@ export default {
   align-items: center;
   justify-content: center;
   border-width: 2px;
-  border-radius: 52px;
 }
 
 .cardTop {
@@ -321,7 +382,6 @@ export default {
 }
 
 .midText {
-  font-size: 24px;
   color: #5fc9a6;
 }
 

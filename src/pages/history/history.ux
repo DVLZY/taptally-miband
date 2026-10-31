@@ -1,22 +1,22 @@
 <template>
-  <div class="root" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+  <div class="root" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="head">
-      <text class="title">记录</text>
-      <text class="count">{{count}}</text>
+      <text class="title" style="font-size: {{titleFs}}px">记录</text>
+      <text class="count" style="font-size: {{noFs}}px">{{count}}</text>
     </div>
     <scroll class="list" scroll-y="true">
-      <div class="item" for="{{records}}" tid="id" onclick="onPick($idx)" onlongpress="onDrop($idx)">
-        <div class="{{$item.side}}"></div>
-        <text class="no">{{$item.no}}</text>
-        <text class="val">{{$item.score}}</text>
-        <text class="time">{{$item.time}}</text>
+      <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px; border-radius: {{itemR}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
+        <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px"></div>
+        <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px; margin-left: {{noMl}}px">{{$item.no}}</text>
+        <text class="val" style="font-size: {{valFs}}px; width: {{valW}}px">{{$item.score}}</text>
+        <text class="time" style="font-size: {{noFs}}px; width: {{timeW}}px; margin-right: {{timeMr}}px">{{$item.time}}</text>
       </div>
       <div class="empty" if="{{empty}}">
         <text class="emptyText">还没有记录</text>
       </div>
     </scroll>
     <div class="foot">
-      <text class="footText">单击恢复 · 长按删除</text>
+      <text class="footText" style="font-size: {{noFs}}px">单击恢复 · 长按删除</text>
     </div>
   </div>
 </template>
@@ -24,6 +24,7 @@
 <script>
 import vibrator from '@system.vibrator'
 import router from '@system.router'
+import device from '@system.device'
 import { loadRecords, saveRecords, saveScore, requestScoreRefresh, formatTime, MAX_RECORDS } from '../../common/store.js'
 
 function coord(evt) {
@@ -41,11 +42,59 @@ function coord(evt) {
   return { x: x, y: y }
 }
 
+const DESIGN_W = 480
+
+function metricsOf(w, h, shape) {
+  const dw = DESIGN_W
+  const dh = dw * h / w
+  let pad = 10
+  if (shape === 'circle') pad = Math.round(dw * 0.1465)
+  else if (shape === 'pill-shaped') pad = 14
+  const itemH = Math.max(56, Math.min(120, Math.round(dh * 0.078)))
+  const accentW = Math.max(6, Math.round(itemH * 0.09))
+  const accentMl = Math.round(itemH * 0.19)
+  const noW = Math.round(itemH * 0.34)
+  const noMl = Math.round(itemH * 0.10)
+  const timeW = Math.round(itemH * 0.78)
+  const timeMr = Math.round(itemH * 0.12)
+  const valW = dw - pad * 2 - (accentW + accentMl) - (noW + noMl) - (timeW + timeMr)
+  return {
+    pad: pad,
+    itemH: itemH,
+    itemR: Math.round(itemH * 0.27),
+    barH: Math.round(itemH * 0.58),
+    valFs: Math.round(itemH * 0.48),
+    noFs: Math.max(16, Math.round(itemH * 0.25)),
+    titleFs: Math.max(20, Math.round(dh * 0.031)),
+    accentW: accentW,
+    accentMl: accentMl,
+    noW: noW,
+    noMl: noMl,
+    valW: valW < 60 ? 60 : valW,
+    timeW: timeW,
+    timeMr: timeMr
+  }
+}
+
 export default {
   private: {
     records: [],
     count: '',
-    empty: true
+    empty: true,
+    pad: 10,
+    itemH: 96,
+    itemR: 26,
+    barH: 56,
+    valFs: 46,
+    noFs: 24,
+    titleFs: 38,
+    accentW: 9,
+    accentMl: 18,
+    noW: 33,
+    noMl: 10,
+    valW: 240,
+    timeW: 75,
+    timeMr: 12
   },
 
   onInit() {
@@ -54,11 +103,43 @@ export default {
   },
 
   onReady() {
+    this.syncDevice()
     this.render()
   },
 
   onShow() {
     this.render()
+  },
+
+  syncDevice() {
+    const that = this
+    try {
+      device.getInfo({
+        success: function (ret) {
+          if (!ret || !ret.screenWidth || !ret.screenHeight) return
+          that.applyMetrics(ret.screenWidth, ret.screenHeight, ret.screenShape)
+        },
+        fail: function () {}
+      })
+    } catch (e) {}
+  },
+
+  applyMetrics(w, h, shape) {
+    const m = metricsOf(w, h, shape)
+    this.pad = m.pad
+    this.itemH = m.itemH
+    this.itemR = m.itemR
+    this.barH = m.barH
+    this.valFs = m.valFs
+    this.noFs = m.noFs
+    this.titleFs = m.titleFs
+    this.accentW = m.accentW
+    this.accentMl = m.accentMl
+    this.noW = m.noW
+    this.noMl = m.noMl
+    this.valW = m.valW
+    this.timeW = m.timeW
+    this.timeMr = m.timeMr
   },
 
   onDestroy() {
@@ -160,12 +241,10 @@ export default {
 }
 
 .title {
-  font-size: 38px;
   color: #d6e8eb;
 }
 
 .count {
-  font-size: 22px;
   color: #6e8c9b;
 }
 
@@ -174,7 +253,6 @@ export default {
 }
 
 .item {
-  height: 96px;
   margin-bottom: 12px;
   flex-direction: row;
   align-items: center;
@@ -185,9 +263,6 @@ export default {
 }
 
 .accent {
-  width: 9px;
-  height: 56px;
-  margin-left: 18px;
   border-width: 2px;
   border-radius: 8px;
 }
@@ -203,24 +278,16 @@ export default {
 }
 
 .no {
-  width: 54px;
-  margin-left: 14px;
-  font-size: 24px;
   color: #60808f;
 }
 
 .val {
-  width: 214px;
-  font-size: 46px;
   font-weight: bold;
   text-align: center;
   color: #deeef5;
 }
 
 .time {
-  width: 118px;
-  margin-right: 20px;
-  font-size: 24px;
   text-align: right;
   color: #60808f;
 }
@@ -243,7 +310,6 @@ export default {
 }
 
 .footText {
-  font-size: 22px;
   color: #4f6b78;
 }
 </style>
