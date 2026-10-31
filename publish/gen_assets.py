@@ -49,7 +49,7 @@ def vgrad_circle(size, c_top, c_bot):
     return base.resize((size, size), Image.BILINEAR)
 
 
-def make_logo(size, ss=4, digit_fs=0.480, stag=0.100, overlap=0.200):
+def make_logo(size, ss=4, digit_fs=0.576, stag=0.120, overlap=0.200):
     """圆形图标：上绿下蓝竖向渐变（无分隔线）。
 
     数字布局按用户给的规则：
