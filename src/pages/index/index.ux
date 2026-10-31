@@ -16,7 +16,7 @@
 import vibrator from '@system.vibrator'
 import router from '@system.router'
 import device from '@system.device'
-import { loadScore, saveScore, addRecord, consumeScoreRefresh } from '../../common/store.js'
+import { loadScore, saveScore, addRecord } from '../../common/store.js'
 
 const DESIGN_W = 480
 let bootScore = null
@@ -81,17 +81,25 @@ export default {
 
   onReady() {
     this.syncDevice()
-    this.restore()
+    this.restore(false)
   },
 
+  // 从列表页返回时**一定**强制回读一次磁盘：列表页可能刚把另一局的比分写进去
   onShow() {
-    if (!this.restored || consumeScoreRefresh()) {
-      this.restored = false
-      this.restore()
+    const that = this
+    if (this.wasHidden) {
+      this.wasHidden = false
+      this.touched = false
+      setTimeout(function () {
+        that.restore(true)
+      }, 60)
+      return
     }
+    if (!this.restored) this.restore(false)
   },
 
   onHide() {
+    this.wasHidden = true
     this.saveNow()
   },
 
@@ -140,7 +148,7 @@ export default {
   },
 
   // ---------- 读取 / 应用 ----------
-  restore() {
+  restore(force) {
     const that = this
     loadScore(function (sc) {
       that.restored = true
@@ -149,7 +157,7 @@ export default {
       } else {
         that.syncFont()
       }
-    })
+    }, !!force)
   },
 
   applyScore(t, b, defer) {

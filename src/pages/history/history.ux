@@ -1,13 +1,12 @@
 <template>
-  <div class="root" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+  <div class="root" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="head">
       <text class="title" style="font-size: {{titleFs}}px">记录</text>
-      <text class="count" style="font-size: {{noFs}}px">{{count}}</text>
     </div>
     <scroll class="list" scroll-y="true">
       <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px; border-radius: {{itemR}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
-        <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px"></div>
-        <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px; margin-left: {{noMl}}px">{{$item.no}}</text>
+        <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px">{{$item.no}}</text>
+        <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px; margin-right: {{accentMr}}px"></div>
         <text class="val" style="font-size: {{valFs}}px; width: {{valW}}px">{{$item.score}}</text>
       </div>
       <div class="empty" if="{{empty}}">
@@ -24,7 +23,7 @@
 import vibrator from '@system.vibrator'
 import router from '@system.router'
 import device from '@system.device'
-import { loadRecords, saveRecords, saveScore, requestScoreRefresh, MAX_RECORDS } from '../../common/store.js'
+import { loadRecords, saveRecords, saveScore, MAX_RECORDS } from '../../common/store.js'
 
 const DESIGN_W = 480
 
@@ -43,51 +42,51 @@ function coord(evt) {
   return { x: x, y: y }
 }
 
-// 只展示「序号 + 比分」，行高比带时间那版更大
+// 行内顺序：序号 → 色条 → 比分；字号比 1.3.0 明显放大
 function metricsOf(w, h, shape) {
   const dw = DESIGN_W
   const dh = dw * h / w
-  let pad = 10
+  let pad = 14
   if (shape === 'circle') pad = Math.round(dw * 0.1465)
-  else if (shape === 'pill-shaped') pad = 14
-  const itemH = Math.max(60, Math.min(132, Math.round(dh * 0.092)))
-  const accentW = Math.max(6, Math.round(itemH * 0.085))
-  const accentMl = Math.round(itemH * 0.20)
-  const noW = Math.round(itemH * 0.36)
-  const noMl = Math.round(itemH * 0.12)
-  const valW = dw - pad * 2 - (accentW + accentMl) - (noW + noMl) - Math.round(itemH * 0.10)
+  else if (shape === 'pill-shaped') pad = 18
+  const itemH = Math.max(64, Math.min(150, Math.round(dh * 0.104)))
+  const noW = Math.round(itemH * 0.40)
+  const accentW = Math.max(6, Math.round(itemH * 0.075))
+  const accentMl = Math.round(itemH * 0.06)
+  const accentMr = Math.round(itemH * 0.20)
+  let valW = dw - pad * 2 - noW - accentW - accentMl - accentMr - Math.round(itemH * 0.08)
+  if (valW < 90) valW = 90
   return {
     pad: pad,
     itemH: itemH,
-    itemR: Math.round(itemH * 0.26),
-    barH: Math.round(itemH * 0.55),
-    valFs: Math.round(itemH * 0.54),
-    noFs: Math.max(16, Math.round(itemH * 0.26)),
-    titleFs: Math.max(20, Math.round(dh * 0.032)),
+    itemR: Math.round(itemH * 0.24),
+    barH: Math.round(itemH * 0.52),
+    valFs: Math.round(itemH * 0.66),
+    noFs: Math.max(20, Math.round(itemH * 0.40)),
+    titleFs: Math.max(24, Math.round(dh * 0.036)),
     accentW: accentW,
     accentMl: accentMl,
+    accentMr: accentMr,
     noW: noW,
-    noMl: noMl,
-    valW: valW < 80 ? 80 : valW
+    valW: valW
   }
 }
 
 export default {
   private: {
     records: [],
-    count: '',
     empty: true,
-    pad: 10,
-    itemH: 112,
-    itemR: 29,
-    barH: 62,
-    valFs: 60,
-    noFs: 29,
-    titleFs: 39,
-    accentW: 10,
-    accentMl: 22,
-    noW: 40,
-    noMl: 13,
+    pad: 14,
+    itemH: 126,
+    itemR: 30,
+    barH: 66,
+    valFs: 83,
+    noFs: 50,
+    titleFs: 44,
+    accentW: 9,
+    accentMl: 8,
+    accentMr: 25,
+    noW: 50,
     valW: 300
   },
 
@@ -133,8 +132,8 @@ export default {
     this.titleFs = m.titleFs
     this.accentW = m.accentW
     this.accentMl = m.accentMl
+    this.accentMr = m.accentMr
     this.noW = m.noW
-    this.noMl = m.noMl
     this.valW = m.valW
   },
 
@@ -148,7 +147,7 @@ export default {
       })
       that.raw = arr
       const rows = []
-      for (let i = 0; i < arr.length; i++) {
+      for (let i = 0; i < arr.length && i < MAX_RECORDS; i++) {
         rows.push({
           id: 'r' + i + '_' + (arr[i].ts || 0),
           no: String(i + 1),
@@ -158,7 +157,6 @@ export default {
       }
       that.records = rows
       that.empty = rows.length === 0
-      that.count = rows.length + ' / ' + MAX_RECORDS
     })
   },
 
@@ -169,17 +167,17 @@ export default {
   },
 
   // 单击：把这条比分恢复到记分页
+  // 先写比分（同步生效），再等一帧返回；记分页 onShow 时必定重新读一次
   onPick(idx) {
     const it = this.raw[idx]
     if (!it) return
     saveScore(it.t, it.b)
-    requestScoreRefresh()
     this.buzz('short')
     setTimeout(function () {
       try {
         router.back()
       } catch (e) {}
-    }, 80)
+    }, 60)
   },
 
   // 长按：删除这条
@@ -225,28 +223,24 @@ export default {
 }
 
 .head {
-  height: 9%;
+  height: 11%;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  padding-left: 22px;
-  padding-right: 22px;
+  justify-content: center;
 }
 
 .title {
   color: #d6e8eb;
-}
-
-.count {
-  color: #6e8c9b;
+  font-weight: bold;
+  text-align: center;
 }
 
 .list {
-  height: 84%;
+  height: 82%;
 }
 
 .item {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   flex-direction: row;
   align-items: center;
   border-width: 2px;
@@ -271,7 +265,7 @@ export default {
 
 .no {
   text-align: center;
-  color: #60808f;
+  color: #6d8d9c;
 }
 
 .val {
