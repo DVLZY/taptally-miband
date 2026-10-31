@@ -19,6 +19,8 @@ FONT_B = r"C:\Windows\Fonts\msyhbd.ttc"
 FONT_R = r"C:\Windows\Fonts\msyh.ttc"
 
 GREEN = (168, 230, 207, 255)
+GREEN_C = (109, 216, 176)   # 渐变上端（偏深的薄荷绿）
+BLUE_C = (146, 205, 245)    # 渐变下端（浅蓝）
 BLUE = (179, 229, 252, 255)
 DARK = (14, 20, 24, 255)
 GREEN_TXT = (11, 107, 79, 255)
@@ -33,38 +35,40 @@ def rounded(size, radius, fill):
     return img
 
 
-def make_logo(size, ss=4, tilt=28.0, gapf=0.045, dist=0.210, along=0.100, fs=0.320):
-    """圆形图标：斜向分隔线（左下 → 右上，"/" 方向），0 居左上、9 居右下。
+def vgrad_circle(size, c_top, c_bot):
+    """生成 size×size 的竖向线性渐变色块（RGB）。"""
+    base = Image.new("RGB", (1, size))
+    d = ImageDraw.Draw(base)
+    for y in range(size):
+        t = y / float(size - 1)
+        d.point((0, y), fill=(
+            int(c_top[0] + (c_bot[0] - c_top[0]) * t),
+            int(c_top[1] + (c_bot[1] - c_top[1]) * t),
+            int(c_top[2] + (c_bot[2] - c_top[2]) * t),
+        ))
+    return base.resize((size, size), Image.BILINEAR)
 
-    手环 9 的图标是圆形裁切，所以图形本身是圆、内容全部落在圆内（留约 6% 边距）。
-    分隔线与数字位置都用同一个倾角参数推导，保证任何尺寸下数字都居中于各自半区。
+
+def make_logo(size, ss=4, digit_fs=0.400, cy_top=0.322, cy_bot=0.678):
+    """圆形图标：上绿下蓝**渐变**背景（无分隔线），0 在上、9 在下，数字大而靠拢。
+
+    手环列表按圆形裁切，所以图形本身画成圆；数字全部落在圆内安全区。
     """
     S = size * ss
-    inner = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    di = ImageDraw.Draw(inner)
-    gap = max(2, int(S * gapf))
-    di.rectangle([0, 0, S, S // 2 - gap // 2], fill=GREEN)
-    di.rectangle([0, S // 2 + gap // 2, S, S], fill=BLUE)
-    di.rectangle([0, S // 2 - gap // 2 - 1, S, S // 2 + gap // 2], fill=(14, 20, 24, 255))
-    inner = inner.rotate(tilt, resample=Image.BICUBIC, expand=False)
-
+    grad = vgrad_circle(S, GREEN_C, BLUE_C)
+    grad = grad.convert("RGBA")
     mask = Image.new("L", (S, S), 0)
-    pad = int(S * 0.01)
+    pad = int(S * 0.005)
     ImageDraw.Draw(mask).ellipse([pad, pad, S - 1 - pad, S - 1 - pad], fill=255)
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    img.paste(inner, (0, 0), mask)
+    img.paste(grad, (0, 0), mask)
 
-    t = math.radians(tilt)
-    u = (math.cos(t), -math.sin(t))   # 沿分隔线（指向右上方）
-    n = (math.sin(t), math.cos(t))    # 法线（指向右下方）
     d = ImageDraw.Draw(img)
-    font = ImageFont.truetype(FONT_B, int(S * fs))
-    for sign, txt, color in ((-1, "0", GREEN_TXT), (1, "9", BLUE_TXT)):
-        cx = 0.5 + sign * (dist * n[0] + along * u[0])
-        cy = 0.5 + sign * (dist * n[1] + along * u[1])
+    font = ImageFont.truetype(FONT_B, int(S * digit_fs))
+    for txt, cy, color in (("0", cy_top, GREEN_TXT), ("9", cy_bot, BLUE_TXT)):
         bb = d.textbbox((0, 0), txt, font=font)
         w, h = bb[2] - bb[0], bb[3] - bb[1]
-        d.text((S * cx - w / 2 - bb[0], S * cy - h / 2 - bb[1]), txt, font=font, fill=color)
+        d.text((S * 0.5 - w / 2 - bb[0], S * cy - h / 2 - bb[1]), txt, font=font, fill=color)
     return img.resize((size, size), Image.LANCZOS)
 
 
