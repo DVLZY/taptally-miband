@@ -88,6 +88,7 @@ export default {
     noW: 50,
     valW: 300,
     footFs: 30,
+    devH: 0,
     foot: 'v' + APP_VERSION,
     dbgOn: true
   },
@@ -125,6 +126,7 @@ export default {
 
   applyMetrics(w, h, shape) {
     const m = metricsOf(w, h, shape)
+    this.devH = h || 0
     this.pad = m.pad
     this.itemH = m.itemH
     this.barH = m.barH
@@ -224,8 +226,23 @@ export default {
     if (!start || !end) return
     const dx = end.x - start.x
     const dy = end.y - start.y
+
+    // 屏幕底部（下方 20%）上滑：返回记分页
+    // 限定底部区域是为了不和列表的上下滚动抢手势——列表只到 78% 高度，
+    // 从页脚那条上滑时列表根本不参与滚动，所以不会互相干扰。
+    const h = this.devH || 490
+    if (start.y >= h * 0.80 && dy < -60 && Math.abs(dy) > Math.abs(dx)) {
+      this.buzz('short')
+      try {
+        router.back()
+      } catch (e) {}
+      return
+    }
+
+    // 左 -> 右滑：返回记分页
     if (Math.abs(dx) <= Math.abs(dy)) return
     if (dx > 90) {
+      this.buzz('short')
       try {
         router.back()
       } catch (e) {}
