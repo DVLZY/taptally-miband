@@ -189,6 +189,11 @@ export default {
   // 单击：把这条比分恢复到记分页
   // 先写比分（同步生效），再等一帧返回；记分页 onShow 时必定重新读一次
   onPick(idx) {
+    // 长按删除后系统仍会派发 click，这里直接忽略
+    if (this.longMark) {
+      this.longMark = false
+      return
+    }
     const it = this.raw[idx]
     if (!it) return
     saveScore(it.t, it.b)
@@ -202,6 +207,7 @@ export default {
 
   // 长按：删除这条
   onDrop(idx) {
+    this.longMark = true
     const it = this.raw[idx]
     if (!it) return
     const list = this.raw.slice(0)
@@ -215,6 +221,7 @@ export default {
   // ---------- 手势：左 -> 右 返回记分页 ----------
   onTouchStart(evt) {
     this.startPoint = coord(evt)
+    this.longMark = false
   },
 
   onTouchEnd(evt) {

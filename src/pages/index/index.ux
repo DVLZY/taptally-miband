@@ -260,6 +260,11 @@ export default {
 
   tap(side) {
     const that = this
+    // 长按已经减过分：这次触摸的 click 直接丢掉，避免"先减一后加一"
+    if (this.longMark || this.suppress) {
+      this.suppress = false
+      return
+    }
     if (this.pendingTimer && this.pendingSide === side) {
       clearTimeout(this.pendingTimer)
       this.pendingTimer = 0
@@ -291,12 +296,28 @@ export default {
     this.tap('bottom')
   },
 
+  // 长按 = 减分。注意：长按之后系统还会再派发一次 click，
+  // 这里先取消挂起的单击、并打上 longMark，让 tap() 忽略这次点击
   onTopLong(evt) {
+    this.cancelPendingTap()
+    this.longMark = true
+    this.suppress = true
     this.minus('top')
   },
 
   onBottomLong(evt) {
+    this.cancelPendingTap()
+    this.longMark = true
+    this.suppress = true
     this.minus('bottom')
+  },
+
+  cancelPendingTap() {
+    if (this.pendingTimer) {
+      clearTimeout(this.pendingTimer)
+      this.pendingTimer = 0
+    }
+    this.pendingSide = ''
   },
 
   // ---------- 上滑两次：存记录 + 归零 ----------
@@ -338,6 +359,9 @@ export default {
   // ---------- 手势 ----------
   onTouchStart(evt) {
     this.startPoint = coord(evt)
+    // 新的一次触摸：清掉上一次的长按标记
+    this.longMark = false
+    this.suppress = false
   },
 
   onTouchEnd(evt) {
