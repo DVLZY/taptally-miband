@@ -8,6 +8,7 @@
   preview-2.png   384x980  预览图 2（手环真实界面 192x490 的 2 倍图）
 另在 publish/ 输出 logo-512/256.png 备用的高清图标。
 """
+import math
 import os
 from PIL import Image, ImageDraw, ImageFont
 
@@ -32,19 +33,20 @@ def rounded(size, radius, fill):
     return img
 
 
-def make_logo(size, ss=4):
-    """圆形图标：整圆上绿下蓝、中间深色分隔，圆形安全区内放 0 / 9。
+def make_logo(size, ss=4, tilt=28.0, gapf=0.045, dist=0.210, along=0.100, fs=0.320):
+    """圆形图标：斜向分隔线（左下 → 右上，"/" 方向），0 居左上、9 居右下。
 
-    手环 9 的应用图标是圆形裁切的，所以图形必须自己就是圆形，
-    并且所有内容都落在圆内（直径上留 ~6% 边距），裁切后不会缺角。
+    手环 9 的图标是圆形裁切，所以图形本身是圆、内容全部落在圆内（留约 6% 边距）。
+    分隔线与数字位置都用同一个倾角参数推导，保证任何尺寸下数字都居中于各自半区。
     """
     S = size * ss
     inner = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     di = ImageDraw.Draw(inner)
-    gap = max(2, int(S * 0.048))
+    gap = max(2, int(S * gapf))
     di.rectangle([0, 0, S, S // 2 - gap // 2], fill=GREEN)
     di.rectangle([0, S // 2 + gap // 2, S, S], fill=BLUE)
     di.rectangle([0, S // 2 - gap // 2 - 1, S, S // 2 + gap // 2], fill=(14, 20, 24, 255))
+    inner = inner.rotate(tilt, resample=Image.BICUBIC, expand=False)
 
     mask = Image.new("L", (S, S), 0)
     pad = int(S * 0.01)
@@ -52,14 +54,17 @@ def make_logo(size, ss=4):
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     img.paste(inner, (0, 0), mask)
 
+    t = math.radians(tilt)
+    u = (math.cos(t), -math.sin(t))   # 沿分隔线（指向右上方）
+    n = (math.sin(t), math.cos(t))    # 法线（指向右下方）
     d = ImageDraw.Draw(img)
-    font = ImageFont.truetype(FONT_B, int(S * 0.365))
-    for txt, cy, color in (("0", 0.272, GREEN_TXT), ("9", 0.728, BLUE_TXT)):
+    font = ImageFont.truetype(FONT_B, int(S * fs))
+    for sign, txt, color in ((-1, "0", GREEN_TXT), (1, "9", BLUE_TXT)):
+        cx = 0.5 + sign * (dist * n[0] + along * u[0])
+        cy = 0.5 + sign * (dist * n[1] + along * u[1])
         bb = d.textbbox((0, 0), txt, font=font)
         w, h = bb[2] - bb[0], bb[3] - bb[1]
-        x = (S - w) / 2 - bb[0]
-        y = S * cy - h / 2 - bb[1]
-        d.text((x, y), txt, font=font, fill=color)
+        d.text((S * cx - w / 2 - bb[0], S * cy - h / 2 - bb[1]), txt, font=font, fill=color)
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -106,8 +111,8 @@ def make_cover(W=1200, H=800):
     lines = [
         "单击 +1 / 双击 −1，短震反馈",
         "上绿下蓝双色分区，比分一眼看清",
-        "比分自动记住，退出重进不丢",
-        "上滑二次确认归零，右滑退出",
+        "下滑看记分列表，单击恢复 / 长按删除",
+        "上滑两次归零存档，右滑退出",
     ]
     y = 320
     for t in lines:
