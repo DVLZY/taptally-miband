@@ -5,7 +5,7 @@
 
 ![封面](media/cover.png)
 
-当前版本 **1.6.8** · 包名 `com.taptally.scoreboard` · [下载安装包](https://github.com/DVLZY/taptally-miband/releases/latest)
+当前版本 **1.6.9** · 包名 `com.taptally.scoreboard` · [下载安装包](https://github.com/DVLZY/taptally-miband/releases/latest)
 
 ---
 

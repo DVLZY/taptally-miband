@@ -20,9 +20,9 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.6.8",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.6.8.rpk",
-      "versionCode": 32,
+      "version": "1.6.9",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.6.9.rpk",
+      "versionCode": 33,
       "updatelogs": [
         {
           "version": "1.0.0",
@@ -47,6 +47,10 @@
         {
           "version": "1.6.8",
           "content": "新增记分列表（5 局、单击恢复/长按删除）；单击立即加分、长按减分；卡片圆角随屏幕形状（胶囊屏 300px）；图标改为圆形渐变、图形占画布 85%"
+        },
+        {
+          "version": "1.6.9",
+          "content": "修复历史页页脚溢出、删除记录后被旧快照覆盖、存档提示条数、版本戳重复与老数据兼容；比分写盘改为 250ms 合并"
         }
       ]
     }
