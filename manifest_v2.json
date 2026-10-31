@@ -3,7 +3,7 @@
     "id": "com.taptally.scoreboard",
     "restype": "quick_app",
     "name": "点记",
-    "description": "手环上的对局计分板：上下双色分区，单击 +1、双击 −1，带短震反馈；比分自动保存，退出重进不丢；上滑二次确认归零，右滑退出。\n适合台球、乒乓、羽毛球、棋牌等面对面对局。",
+    "description": "手环上的对局计分板：上下双色分区，单击 +1、长按 −1，带短震反馈；比分自动保存，退出重进不丢；上滑两次归零并存入记分列表（最近 5 局），右→左划查看历史，单击恢复、长按删除。\n适合台球、乒乓、羽毛球、棋牌等面对面对局。",
     "preview": [
       "media/preview-1.png",
       "media/preview-2.png"
@@ -20,13 +20,29 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.0.0",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.0.0.rpk",
-      "versionCode": 1,
+      "version": "1.6.0",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.6.0.rpk",
+      "versionCode": 24,
       "updatelogs": [
         {
           "version": "1.0.0",
-          "content": "首个版本：上下双色分区布局；单击 +1 / 双击 −1 带短震反馈；上滑二次确认归零、右滑退出；比分本地保存。"
+          "content": "首个版本：上下双色分区；单击 +1 / 双击 −1；上滑两次归零；比分本地保存。"
+        },
+        {
+          "version": "1.1.0",
+          "content": "新增记分列表（最近 10 局）、下滑进入、单击恢复、长按删除；新 UI。"
+        },
+        {
+          "version": "1.2.0",
+          "content": "按屏幕宽高与形状自适应，支持手环 9 / 10 / Pro / 手表等机型。"
+        },
+        {
+          "version": "1.5.0",
+          "content": "修复历史记录只剩 1 条（改为追加日志，写时不读）；单击立即 +1，减一改为长按。"
+        },
+        {
+          "version": "1.6.0",
+          "content": "记分列表上限 5 局并按时间倒序；右→左划查看历史；卡片圆角跟随屏幕；图标改为圆形渐变。"
         }
       ]
     }

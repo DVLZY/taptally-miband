@@ -86,6 +86,7 @@ export default {
     titleFs: 44,
     dbgFs: 56,
     dbg: '',
+    dbgOn: false,
     accentW: 9,
     accentMl: 8,
     accentMr: 25,
@@ -148,9 +149,18 @@ export default {
 
   // 长按标题：在页脚切换显示诊断数字
   // S/F = 偏好存储 / 文件里读到多少字符（null 表示读不到），N = 内存里几条
+  // 长按标题：切换诊断行（S/F/L/N），排查数据通道用
   onTitleLong() {
+    const that = this
     this.buzz('short')
-    this.dbg = 'v' + APP_VERSION
+    this.dbgOn = !this.dbgOn
+    if (!this.dbgOn) {
+      this.dbg = ''
+      return
+    }
+    debugStats(function (st) {
+      that.dbg = 'S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
+    })
   },
 
   // 时间降序：最新的一局在最上面
@@ -174,9 +184,11 @@ export default {
       that.records = rows
       that.empty = rows.length === 0
       // 诊断常显：S/F = 偏好存储与文件里读到多少字符，L = 追加日志字符数，N = 内存条数
-      debugStats(function (st) {
-        that.dbg = 'S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
-      })
+      if (that.dbgOn) {
+        debugStats(function (st) {
+          that.dbg = 'S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
+        })
+      }
     })
   },
 
@@ -253,7 +265,7 @@ export default {
 }
 
 .head {
-  height: 18%;
+  height: 12%;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -272,7 +284,7 @@ export default {
 }
 
 .list {
-  height: 72%;
+  height: 80%;
 }
 
 .item {
