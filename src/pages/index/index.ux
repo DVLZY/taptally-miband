@@ -350,12 +350,17 @@ export default {
     if (!start || !end) return
     const dx = end.x - start.x
     const dy = end.y - start.y
-    // 横向：左 -> 右，退出
+    // 横向：左 -> 右 退出；右 -> 左 进记分列表
     if (Math.abs(dx) > Math.abs(dy)) {
       if (dx > 90) {
         this.saveNow()
         try {
           router.back()
+        } catch (e) {}
+      } else if (dx < -90) {
+        this.saveNow()
+        try {
+          router.push({ uri: '/pages/history' })
         } catch (e) {}
       }
       return
@@ -364,13 +369,6 @@ export default {
     if (dy < -90) {
       this.resetFlow()
       return
-    }
-    // 下滑：进入记分列表
-    if (dy > 90) {
-      this.saveNow()
-      try {
-        router.push({ uri: '/pages/history' })
-      } catch (e) {}
     }
   }
 }
