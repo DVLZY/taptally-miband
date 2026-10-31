@@ -23,7 +23,7 @@ const VER_SEP = '|'
 export const MAX_RECORDS = 5
 
 // 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
-export const APP_VERSION = '1.6.8'
+export const APP_VERSION = '1.6.9'
 
 // 内存缓存
 let scoreCache = null // { t, b }
@@ -146,6 +146,28 @@ function parseList(body) {
   if (!body) return null
   const s = String(body).trim()
   if (!s) return null
+  // 老版本（1.1.0~1.3.1）整份存的是 JSON 数组 [[t,b,ts],…]：
+  // 升级后必须能读回来，否则用户的历史记录会静默清空
+  if (s.charAt(0) === '[') {
+    try {
+      const arr = JSON.parse(s)
+      if (arr && typeof arr.length === 'number') {
+        const legacy = []
+        for (let i = 0; i < arr.length; i++) {
+          const row = arr[i]
+          if (!row || typeof row.length !== 'number' || row.length < 2) continue
+          const lt = parseInt(row[0], 10)
+          const lb = parseInt(row[1], 10)
+          const lts = row.length > 2 ? parseInt(row[2], 10) : 0
+          if (isNaN(lt) || isNaN(lb)) continue
+          if (lt < 0 || lb < 0 || lt > 999 || lb > 999) continue
+          legacy.push({ t: lt, b: lb, ts: isNaN(lts) ? 0 : lts })
+        }
+        return legacy
+      }
+    } catch (e) {}
+    return null
+  }
   const segs = s.split(';')
   const out = []
   for (let i = 0; i < segs.length; i++) {
@@ -211,8 +233,11 @@ function normalize(lists) {
 }
 
 // 落盘：两个通道写同一份带新版本戳的文本
+// 版本戳必须**严格递增**：同一毫秒内两个页面各写一次时，若戳相同，
+// loadRecords 会走「戳相等则合并两份」的分支，删除掉的条目可能被另一份加回来。
 function flush() {
-  recordStamp = now() || recordStamp + 1
+  const t = now()
+  recordStamp = t > recordStamp ? t : recordStamp + 1
   const text = pack(recordCache || [], recordStamp)
   writeBoth(RECORD_KEY, RECORD_FILE, text)
 }
@@ -297,7 +322,7 @@ export function pad2(n) {
   return n < 10 ? '0' + n : String(n)
 }
 
-// 时间戳 -> "21:05"；拿不到时间返回空串
+// 时间戳 -> "21:05"；拿不到时间返回空串（列表当前不显示时间，保留给诊断用）
 export function formatTime(ts) {
   if (!ts) return ''
   try {

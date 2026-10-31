@@ -26,7 +26,7 @@
 import vibrator from '@system.vibrator'
 import router from '@system.router'
 import device from '@system.device'
-import { loadRecords, saveRecords, saveScore, debugStats, MAX_RECORDS, APP_VERSION } from '../../common/store.js'
+import { loadRecords, removeRecord, saveScore, debugStats, MAX_RECORDS, APP_VERSION } from '../../common/store.js'
 
 const DESIGN_W = 480
 
@@ -148,9 +148,7 @@ export default {
     this.footFs = m.footFs
   },
 
-  // 长按标题：在页脚切换显示诊断数字
-  // S/F = 偏好存储 / 文件里读到多少字符（null 表示读不到），N = 内存里几条
-  // 长按标题：切换诊断行（S/F/L/N），排查数据通道用
+  // 长按标题：切换标题下方的诊断行（S/F = 两通道读到的字符数，N = 内存条数）
   onTitleLong() {
     const that = this
     this.buzz('short')
@@ -219,16 +217,17 @@ export default {
   },
 
   // 长按：删除这条
+  // 走 store.removeRecord（内部先强制回读磁盘再删）：
+  // 直接用 this.raw 这份渲染快照覆盖写盘，会把别的页面刚存的记录冲掉
   onDrop(idx) {
     this.longMark = true
-    const it = this.raw[idx]
-    if (!it) return
-    const list = this.raw.slice(0)
-    list.splice(idx, 1)
-    this.raw = list
+    const that = this
+    if (!this.raw[idx]) return
     this.buzz('short')
-    saveRecords(list)
-    this.render()
+    removeRecord(idx, function (list) {
+      that.raw = (list || []).slice(0)
+      that.render()
+    })
   },
 
   // ---------- 手势：左 -> 右 返回记分页 ----------
@@ -285,7 +284,9 @@ export default {
 }
 
 .list {
-  height: 80%;
+  /* 12% + 78% + 10% 必须正好 100%：之前写 80% 合计 102%，
+     页脚会被挤出屏幕（就是「看不到页脚/诊断串」的原因之一） */
+  height: 78%;
   /* scroll 内的内容容器默认是 row，不写 column 的话所有条目会横向排开，
      屏幕上只看得到第一条（删掉它才露出下一条）——这就是「只显示 1 条」的根因 */
   flex-direction: column;

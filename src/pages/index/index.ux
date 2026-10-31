@@ -175,10 +175,19 @@ export default {
   // 否则会出现「跳回来了但比分没变」。
   restore(force) {
     const that = this
+    // 非强制模式下，正在进行的首轮读取还没回来就别再发一次
+    if (!force && this.restorePending) return
+    this.restorePending = true
+    // 兜底：万一某个通道的回调没回来，1.2 秒后也要把标记放开，
+    // 否则后续 onShow 的恢复会被这个标记一直挡住
+    setTimeout(function () {
+      that.restorePending = false
+    }, 1200)
     const attempt = function (left) {
       loadScore(function (sc) {
         that.restored = true
         if (sc) {
+          that.restorePending = false
           that.applyScore(sc.t, sc.b, true)
           return
         }
@@ -188,6 +197,7 @@ export default {
           }, 150)
           return
         }
+        that.restorePending = false
         that.syncFont()
       }, true)
     }
@@ -213,12 +223,24 @@ export default {
   },
 
   // ---------- 写入 ----------
+  // 连点时会连续触发写盘，而手环的 flash 写入不宜过于频繁：
+  // save() 只排一次 250ms 后的写；真正需要立即落盘的时机（退出、切页、归零、恢复）
+  // 一律走 saveNow()。
   save() {
     bootScore = { t: this.num(this.top), b: this.num(this.bottom) }
-    saveScore(bootScore.t, bootScore.b)
+    const that = this
+    if (this.saveTimer) clearTimeout(this.saveTimer)
+    this.saveTimer = setTimeout(function () {
+      that.saveTimer = 0
+      saveScore(bootScore.t, bootScore.b)
+    }, 250)
   },
 
   saveNow() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = 0
+    }
     bootScore = { t: this.num(this.top), b: this.num(this.bottom) }
     saveScore(bootScore.t, bootScore.b)
   },
@@ -299,8 +321,8 @@ export default {
     this.tap('bottom')
   },
 
-  // 长按 = 减分。注意：长按之后系统还会再派发一次 click，
-  // 打上 longMark：长按之后系统还会补发一次 click，tap() 见到标记直接丢掉
+  // 长按 = 减分。系统在 longpress 之后还会补发一次 click，
+  // 所以打上 longMark，让 tap() 把它丢掉，避免「先 −1 再 +1」
   onTopLong(evt) {
     this.longMark = true
     this.minus('top')
@@ -330,21 +352,21 @@ export default {
     this.armed = false
     const t = this.num(this.top)
     const b = this.num(this.bottom)
-    // 0:0 不入列表
-    if (t > 0 || b > 0) {
-      addRecord(t, b)
-    }
     this.touched = true
     this.top = '0'
     this.bottom = '0'
     this.syncFont()
     this.buzzDouble()
-    this.save()
-    this.mid = ''
-    const that2 = this
-    loadRecords(function (list) {
-      that2.showMid('已存 ' + (list ? list.length : 0) + ' 条', 1500)
-    }, true)
+    this.saveNow()
+    // 0:0 不入列表；有比分才存档，并存完再用回调里的真实条数提示
+    // （之前另起一次 loadRecords(force) 会和 addRecord 的内部回读抢时序，条数可能显示成旧的）
+    if (t > 0 || b > 0) {
+      addRecord(t, b, function (list) {
+        that.showMid('已存 ' + (list ? list.length : 0) + ' 条', 1500)
+      })
+    } else {
+      this.mid = ''
+    }
   },
 
   // ---------- 手势 ----------

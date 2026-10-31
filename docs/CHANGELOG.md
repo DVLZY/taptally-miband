@@ -237,3 +237,16 @@
 - 删除一次性产物：`design/`（方案对比图与生成脚本）、`publish/` 下的图标对比/预览脚本与图片、`publish/index_row.csv`、`publish/__pycache__`
 - 只保留复用资产：`publish/gen_assets.py`（生成 icon/封面/预览）、`publish/make_submission.py`、`publish/发布说明.md`
 - `downloads/` 只保留当前 release 包；`manifest_v2.json` 升到 1.6.8
+
+## 1.6.9（versionCode 33）— 代码自检版
+
+修复：
+- **历史页布局溢出**：`.head` 12% + `.list` 80% + `.foot` 10% = 102%，页脚被挤出可视区；列表改回 78%
+- **删除记录改用 `removeRecord`**：原来长按删除是把页面渲染快照整份写回，会把别的页面刚存的记录冲掉；现在走「先强制回读磁盘再删」
+- **「已存 N 条」条数可能偏小**：归零后另起一次 `loadRecords(force)` 与 `addRecord` 内部回读抢时序，改成用 `addRecord` 的回调结果
+- **版本戳可能重复**：同一毫秒内两次 `flush()` 会得到相同戳，读取时走「戳相等则合并」分支，删掉的条目可能被另一份加回来；改为严格递增
+- **老数据兼容**：1.3.1 及以前历史记录是 JSON 数组 `[[t,b,ts],…]`，升级后会读不出来（静默清空）；`parseList` 增加 JSON 分支
+
+优化：
+- **比分写盘节流**：连点时每次点击都写 storage + file，改为 250ms 合并一次；退出/切页/归零/恢复仍走 `saveNow()` 立即写
+- **`restore()` 去重**：首轮读取未返回时 `onShow` 不再重复发起，另加 1.2 秒兜底放开标记
