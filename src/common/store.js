@@ -1,11 +1,13 @@
 // 数据层：比分与历史记录
 // 双通道持久化：@system.storage（偏好存储）+ @system.file（应用私有文件）
-// 读取时两处都读，任一处能解析出合法数据即可恢复。
 //
-// 关键设计（1.3.2 起）：所有数据在模块内有一份**内存缓存**。
-//   - 写入：先更新缓存（同步、立即生效），再落盘；即使某次落盘/回读失败，本会话内也不会丢
-//   - 读取：缓存已有值就直接用，不再依赖异步回读（回读在真机上偶发返回旧值会导致「只剩 1 条」）
-//   - 落盘格式改成纯文本（逗号/分号分隔），不依赖 JSON，避免不同平台 JSON 实现差异
+// 关键设计（1.6.4 起）：
+//   1) 所有数据在模块内有一份**内存缓存**，写入先改缓存（同步生效）再落盘；
+//   2) 落盘带**版本戳**（毫秒时间戳前缀），读取时两个通道谁的时间戳新就用谁 ——
+//      这样「删除后又被旧数据捞回来」的情况不会发生；
+//   3) 放弃 1.5.0 引入的「追加日志」通道：真机上 append 不可靠，且删除后
+//      再合并日志会把删掉的条目重新捞回来（用户 1.6.3 实测复现）。
+//      两个通道都写、读取时按版本戳取最新，已经足够。
 
 import storage from '@system.storage'
 import file from '@system.file'
@@ -14,19 +16,27 @@ const SCORE_KEY = 'taptally_v1'
 const SCORE_FILE = 'internal://files/taptally-score.txt'
 const RECORD_KEY = 'taptally_records_v1'
 const RECORD_FILE = 'internal://files/taptally-records.txt'
-// 追加日志：每条记录单独 append 一行，写的时候不需要先读
-// 这是「历史只剩 1 条」的根治手段——原实现每次都要「读全量→合并→覆盖写」，
-// 只要那一次读取拿到旧值/空值，旧记录就被覆盖掉了；追加永不覆盖。
-const RECORD_LOG = 'internal://files/taptally-records.log'
+
+// 版本戳与记录列表之间的分隔符（老数据没有这个前缀，按版本 0 处理）
+const VER_SEP = '|'
 
 export const MAX_RECORDS = 5
 
 // 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
-export const APP_VERSION = '1.6.3'
+export const APP_VERSION = '1.6.4'
 
 // 内存缓存
 let scoreCache = null // { t, b }
 let recordCache = null // [{ t, b, ts }]
+let recordStamp = 0 // 当前记录列表的版本戳
+
+function now() {
+  try {
+    return Date.now() || 0
+  } catch (e) {
+    return 0
+  }
+}
 
 // 兼容 success 回调的多种形态：原始字符串 / {value} / {data}
 function pick(data) {
@@ -131,16 +141,12 @@ export function loadScore(cb, force) {
 }
 
 // ---------- 历史记录 ----------
-// 三通道并行：追加日志 RECORD_LOG（只追加，不读即写）+ 偏好存储 + 整份文件
-// 任一通道能读到就合并，按 (t,b,ts) 去重，时间倒序，取前 MAX_RECORDS 条
-function parseRecords(raw) {
-  if (!raw) return null
-  const s = String(raw).trim()
+// 单条格式 "上-下-时间戳"，多条用分号；整体再加 "版本戳|" 前缀
+function parseList(body) {
+  if (!body) return null
+  const s = String(body).trim()
   if (!s) return null
-  // 日志每行一条、整份文件分号分隔，两种都吃（不用正则，避开转义坑）
-  const nl = String.fromCharCode(10)
-  const cr = String.fromCharCode(13)
-  const segs = s.split(nl).join(';').split(cr).join(';').split(';').join(',').split(',')
+  const segs = s.split(';')
   const out = []
   for (let i = 0; i < segs.length; i++) {
     const seg = String(segs[i]).trim()
@@ -154,16 +160,27 @@ function parseRecords(raw) {
     if (t < 0 || b < 0 || t > 999 || b > 999) continue
     out.push({ t: t, b: b, ts: isNaN(ts) ? 0 : ts })
   }
-  if (!out.length) return null
   return out
 }
 
-function serialize(list) {
+// 拆版本戳前缀：老数据没有前缀，版本戳记 0
+function unpack(raw) {
+  if (raw === undefined || raw === null) return null
+  const s = String(raw).trim()
+  if (!s) return null
+  const i = s.indexOf(VER_SEP)
+  if (i < 0) return { stamp: 0, list: parseList(s) }
+  const head = s.slice(0, i)
+  const stamp = parseInt(head, 10)
+  return { stamp: isNaN(stamp) ? 0 : stamp, list: parseList(s.slice(i + 1)) }
+}
+
+function pack(list, stamp) {
   const segs = []
   for (let i = 0; i < list.length; i++) {
     segs.push(list[i].t + '-' + list[i].b + '-' + (list[i].ts || 0))
   }
-  return segs.join(';')
+  return String(stamp) + VER_SEP + segs.join(';')
 }
 
 function clone(list) {
@@ -193,28 +210,11 @@ function normalize(lists) {
   return out.slice(0, MAX_RECORDS)
 }
 
-// 读一条额外通道（日志用 readText，其余同 readBoth）
-function readLog(cb) {
-  try {
-    file.readText({
-      uri: RECORD_LOG,
-      success: function (data) {
-        cb(data && data.text ? String(data.text) : null)
-      },
-      fail: function () {
-        cb(null)
-      }
-    })
-  } catch (e) {
-    cb(null)
-  }
-}
-
-// 追加一行；append 不受支持时会退化成覆盖（那也只丢日志通道，另外两通道还在）
-function appendLine(line) {
-  try {
-    file.writeText({ uri: RECORD_LOG, text: line + String.fromCharCode(10), append: true, fail: function () {} })
-  } catch (e) {}
+// 落盘：两个通道写同一份带新版本戳的文本
+function flush() {
+  recordStamp = now() || recordStamp + 1
+  const text = pack(recordCache || [], recordStamp)
+  writeBoth(RECORD_KEY, RECORD_FILE, text)
 }
 
 export function loadRecords(cb, force) {
@@ -226,78 +226,67 @@ export function loadRecords(cb, force) {
     return
   }
   readBoth(RECORD_KEY, RECORD_FILE, function (out) {
-    const fromStore = parseRecords(out.s)
-    const fromFile = parseRecords(out.f)
-    readLog(function (logText) {
-      const fromLog = parseRecords(logText)
-      recordCache = normalize([recordCache, fromLog, fromStore, fromFile])
-      cb(clone(recordCache))
-    })
+    const a = unpack(out.s)
+    const b = unpack(out.f)
+    let chosen = null
+    if (a && b) {
+      if (a.stamp > b.stamp) chosen = a
+      else if (b.stamp > a.stamp) chosen = b
+      else chosen = { stamp: a.stamp, list: normalize([a.list, b.list]) }
+    } else {
+      chosen = a || b
+    }
+    if (chosen && (chosen.stamp > recordStamp || !recordCache)) {
+      recordCache = normalize([chosen.list])
+      recordStamp = chosen.stamp
+    }
+    if (!recordCache) recordCache = []
+    cb(clone(recordCache))
   })
 }
 
 export function saveRecords(list) {
   recordCache = normalize([list])
-  const text = serialize(recordCache)
-  writeBoth(RECORD_KEY, RECORD_FILE, text)
-  // 删除/清空后必须把日志也重写成最终结果，否则下次合并会把删掉的条目捞回来
-  try {
-    file.writeText({ uri: RECORD_LOG, text: text ? text + String.fromCharCode(10) : '' })
-  } catch (e) {}
+  flush()
 }
 
-// 新增一条：
-//   1) 先 append 一行到日志（不需要读，绝不会覆盖旧记录）
-//   2) 同步更新内存缓存并先写一次（本会话内立即生效）
-//   3) 再异步把「日志 + 存储 + 文件」读回来的全量合并重写一次（跨页/跨会话也在）
-// 旧实现是「读全量 → 合并 → 覆盖写」，页面第一次加记录时缓存还是空的，
-// 读回来的可能只有 1 条，于是把历史覆盖成 1 条 —— 这就是「历史只剩 1 条」的根因。
+// 新增一条：只改内存 + 落盘，**不再回读合并**（回读会把刚删掉的条目捞回来）
 export function addRecord(t, b, cb) {
   const entry = { t: t, b: b, ts: now() }
-  appendLine(entry.t + '-' + entry.b + '-' + entry.ts)
   recordCache = normalize([[entry], recordCache || []])
-  writeBoth(RECORD_KEY, RECORD_FILE, serialize(recordCache))
-  const snapshot = clone(recordCache)
-  if (cb) cb(snapshot)
-  loadRecords(function (list) {
-    recordCache = normalize([recordCache, list])
-    writeBoth(RECORD_KEY, RECORD_FILE, serialize(recordCache))
-  }, true)
+  flush()
+  if (cb) cb(clone(recordCache))
 }
 
-// 删除第 idx 条
+// 删除第 idx 条：直接在缓存上删，然后整份重写
 export function removeRecord(idx, cb) {
-  loadRecords(function (list) {
+  const run = function (list) {
     if (idx < 0 || idx >= list.length) {
       if (cb) cb(clone(list))
       return
     }
     list.splice(idx, 1)
     saveRecords(list)
-    if (cb) cb(clone(list))
-  })
+    if (cb) cb(clone(recordCache || list))
+  }
+  if (recordCache) run(clone(recordCache))
+  else loadRecords(run, true)
 }
 
-// 诊断：三条通道各读到多少字符 + 内存条数，页面直接显示，用来定位「历史只有 1 条」
+// 诊断：两通道字符数 + 版本戳 + 内存条数
 export function debugStats(cb) {
   readBoth(RECORD_KEY, RECORD_FILE, function (out) {
-    readLog(function (logText) {
-      cb({
-        s: out.s === null ? 'null' : String(out.s).length,
-        f: out.f === null ? 'null' : String(out.f).length,
-        l: logText === null ? 'null' : String(logText).length,
-        c: recordCache ? recordCache.length : -1
-      })
+    const a = unpack(out.s)
+    const b = unpack(out.f)
+    cb({
+      s: out.s === null ? 'null' : String(out.s).length,
+      f: out.f === null ? 'null' : String(out.f).length,
+      l: recordStamp,
+      c: recordCache ? recordCache.length : -1,
+      ds: a ? a.stamp : -1,
+      df: b ? b.stamp : -1
     })
   })
-}
-
-function now() {
-  try {
-    return Date.now() || 0
-  } catch (e) {
-    return 0
-  }
 }
 
 export function pad2(n) {

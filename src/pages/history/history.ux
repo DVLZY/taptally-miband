@@ -96,8 +96,7 @@ export default {
     valW: 300,
     footFs: 30,
     devH: 0,
-    foot: 'v' + APP_VERSION,
-    dbgOn: true
+    foot: 'v' + APP_VERSION
   },
 
   onInit() {

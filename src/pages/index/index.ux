@@ -157,7 +157,7 @@ export default {
   applyMetrics(w, h, shape) {
     // 圆角跟屏幕自身的圆角对齐：pill-shaped 屏（手环9）四角很圆，
     // 52px 显得方、1000px（胶囊）又太圆，取屏幕圆角量级 ≈ 屏宽×0.23
-    this.rCls = shape === 'pill-shaped' ? 'rndPill' : (shape === 'circle' ? 'rndCircle' : '')
+    this.rCls = shape === 'pill-shaped' ? 'rndPill' : (shape === 'circle' ? 'rndCircle' : 'rndRect')
     this.devW = w
     this.devH = h
     this.devShape = shape || 'rect'
@@ -399,25 +399,29 @@ export default {
   justify-content: center;
   border-width: 2px;
   /* 首帧兜底：数据绑定要等第一次渲染后才生效，
-     这里先给一个与手环9 一致的圆角，避免"先直角后圆角"的闪一下 */
-  border-radius: 52px;
+     这里先给手环9 的圆角（200px），避免"先直角后圆角"的闪一下 */
+  border-radius: 200px;
 }
 
 .cardTop {
   background-color: #7fd9b7;
   border-color: #9ff0d5;
-  border-radius: 52px;
+  border-radius: 200px;
 }
 
 .cardBot {
   background-color: #92cdf5;
   border-color: #bfe6ff;
-  border-radius: 52px;
+  border-radius: 200px;
 }
 
 /* 必须写在 .cardTop/.cardBot 之后：同为单类选择器，后写的才生效 */
 .rndPill {
-  border-radius: 110px;
+  border-radius: 200px;
+}
+
+.rndRect {
+  border-radius: 52px;
 }
 
 .rndCircle {
