@@ -266,6 +266,8 @@ export default {
   border-width: 2px;
   border-color: #1b2932;
   background-color: #101c23;
+  /* 首帧兜底，理由同首页卡片 */
+  border-radius: 30px;
 }
 
 .accent {
