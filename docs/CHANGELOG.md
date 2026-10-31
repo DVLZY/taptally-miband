@@ -131,3 +131,12 @@
 - aiot-toolkit 遇到语法错误的模块**不报错**，直接编译成空模块
   （bundle 里变成 `"./src/common/store.js" () {}`），页面照常渲染但数据层静默失效
 - 新增 `scripts/check_syntax.py`：build 前把所有 .ux 的 `<script>` 与 .js 抽出来跑 `node --check`
+
+## 1.5.1（versionCode 19）
+
+- 圆角恢复成 1.5.0 之前的观感：去掉 `cardPill`/`itemPill` 类，卡片与列表条目一律固定 52px / 30px
+  （1.5.0 用类名做圆角时，胶囊类在 pill-shaped 屏上生效，圆角比之前明显更圆）
+- 修「进入时上半区比分先小后大」：`fsTop` 初值是 362、`fsBot` 是 425，首帧两侧不一致，
+  设备参数到位后 `syncFont()` 才统一 → 两个都用 425（手环9 上 `sizeFor(0)` 的结果）
+- 历史页页脚：高度 7%→12%、列表 82%→78%、字号 `max(16, dh*0.018)`→`max(26, dh*0.026)`，
+  居中显示，并把诊断串缩短为 `S.. F.. L.. N..` 保证一行放得下
