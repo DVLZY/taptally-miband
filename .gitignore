@@ -10,3 +10,7 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# Python
+__pycache__/
+*.pyc
