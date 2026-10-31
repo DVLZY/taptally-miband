@@ -1,8 +1,8 @@
 {
   "package": "com.taptally.scoreboard",
   "name": "点记",
-  "versionName": "1.6.5",
-  "versionCode": 29,
+  "versionName": "1.6.6",
+  "versionCode": 30,
   "minPlatformVersion": 1200,
   "icon": "/common/logo.png",
   "deviceTypeList": [

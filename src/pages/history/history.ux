@@ -160,7 +160,7 @@ export default {
       return
     }
     debugStats(function (st) {
-      that.dbg = 'S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
+      that.dbg = 'S' + st.s + ' F' + st.f + ' N' + st.c
     })
   },
 
@@ -184,10 +184,10 @@ export default {
       }
       that.records = rows
       that.empty = rows.length === 0
-      // 诊断常显：S/F = 偏好存储与文件里读到多少字符，L = 追加日志字符数，N = 内存条数
+      // 诊断：S/F = 偏好存储与文件里读到多少字符，N = 内存条数
       if (that.dbgOn) {
         debugStats(function (st) {
-          that.dbg = 'S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
+          that.dbg = 'S' + st.s + ' F' + st.f + ' N' + st.c
         })
       }
     })

@@ -23,7 +23,7 @@ const VER_SEP = '|'
 export const MAX_RECORDS = 5
 
 // 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
-export const APP_VERSION = '1.6.5'
+export const APP_VERSION = '1.6.6'
 
 // 内存缓存
 let scoreCache = null // { t, b }
