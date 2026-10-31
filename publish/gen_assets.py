@@ -49,7 +49,7 @@ def vgrad_circle(size, c_top, c_bot):
     return base.resize((size, size), Image.BILINEAR)
 
 
-def make_logo(size, ss=4, digit_fs=0.576, stag=0.120, overlap=0.200):
+def make_logo(size, ss=4, digit_fs=0.576, stag=0.120, overlap=0.200, pad_ratio=0.120):
     """圆形图标：上绿下蓝竖向渐变（无分隔线）。
 
     数字布局按用户给的规则：
@@ -59,21 +59,26 @@ def make_logo(size, ss=4, digit_fs=0.576, stag=0.120, overlap=0.200):
     """
     S = size * ss
     grad = vgrad_circle(S, GREEN_C, BLUE_C).convert("RGBA")
+    # 圆形四周留透明边距：手环列表里原生图标的视觉直径都比画布小一圈，
+    # 我们自己画满会导致「图标比别家大一圈、把下面的应用名挤掉」
+    pad = int(S * pad_ratio)
     mask = Image.new("L", (S, S), 0)
-    pad = int(S * 0.005)
     ImageDraw.Draw(mask).ellipse([pad, pad, S - 1 - pad, S - 1 - pad], fill=255)
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     img.paste(grad, (0, 0), mask)
 
     d = ImageDraw.Draw(img)
-    font = ImageFont.truetype(FONT_B, int(S * digit_fs))
+    # 数字整体按内圆等比缩放：留白加大后，数字跟着缩小，避免压到圆弧外
+    k = 1.0 - 2.0 * pad_ratio
+    font = ImageFont.truetype(FONT_B, max(8, int(S * digit_fs * k)))
     bb0 = d.textbbox((0, 0), "0", font=font)
     bb9 = d.textbbox((0, 0), "9", font=font)
     h = max(bb0[3] - bb0[1], bb9[3] - bb9[1])
     dyc = 0.5 * (1.0 - overlap) * h       # 中心到中心的竖直距离
+    off = stag * k                         # 水平错开（按内圆等比缩放）
     for txt, bb, cx, cy, color in (
-            ("0", bb0, 0.5 - stag, 0.5 - dyc / S, GREEN_TXT),
-            ("9", bb9, 0.5 + stag, 0.5 + dyc / S, BLUE_TXT)):
+            ("0", bb0, 0.5 - off, 0.5 - dyc / S, GREEN_TXT),
+            ("9", bb9, 0.5 + off, 0.5 + dyc / S, BLUE_TXT)):
         w, hh = bb[2] - bb[0], bb[3] - bb[1]
         d.text((S * cx - w / 2 - bb[0], S * cy - hh / 2 - bb[1]), txt, font=font, fill=color)
     return img.resize((size, size), Image.LANCZOS)
