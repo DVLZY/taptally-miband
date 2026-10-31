@@ -1,0 +1,249 @@
+<template>
+  <div class="root" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="head">
+      <text class="title">记录</text>
+      <text class="count">{{count}}</text>
+    </div>
+    <scroll class="list" scroll-y="true">
+      <div class="item" for="{{records}}" tid="id" onclick="onPick($idx)" onlongpress="onDrop($idx)">
+        <div class="{{$item.side}}"></div>
+        <text class="no">{{$item.no}}</text>
+        <text class="val">{{$item.score}}</text>
+        <text class="time">{{$item.time}}</text>
+      </div>
+      <div class="empty" if="{{empty}}">
+        <text class="emptyText">还没有记录</text>
+      </div>
+    </scroll>
+    <div class="foot">
+      <text class="footText">单击恢复 · 长按删除</text>
+    </div>
+  </div>
+</template>
+
+<script>
+import vibrator from '@system.vibrator'
+import router from '@system.router'
+import { loadRecords, saveRecords, saveScore, requestScoreRefresh, formatTime, MAX_RECORDS } from '../../common/store.js'
+
+function coord(evt) {
+  let t = evt
+  if (evt && evt.touches && evt.touches.length) t = evt.touches[0]
+  else if (evt && evt.changedTouches && evt.changedTouches.length) t = evt.changedTouches[0]
+  if (!t) return null
+  let x = t.clientX
+  if (x === undefined || x === null) x = t.pageX
+  if (x === undefined || x === null) x = t.offsetX
+  let y = t.clientY
+  if (y === undefined || y === null) y = t.pageY
+  if (y === undefined || y === null) y = t.offsetY
+  if (x === undefined || x === null || y === undefined || y === null) return null
+  return { x: x, y: y }
+}
+
+export default {
+  private: {
+    records: [],
+    count: '',
+    empty: true
+  },
+
+  onInit() {
+    this.startPoint = null
+    this.raw = []
+  },
+
+  onReady() {
+    this.render()
+  },
+
+  onShow() {
+    this.render()
+  },
+
+  onDestroy() {
+    this.raw = []
+  },
+
+  render() {
+    const that = this
+    loadRecords(function (list) {
+      that.raw = list || []
+      const rows = []
+      for (let i = 0; i < that.raw.length; i++) {
+        const it = that.raw[i]
+        rows.push({
+          id: 'r' + i,
+          no: String(i + 1),
+          score: it.t + ':' + it.b,
+          time: formatTime(it.ts),
+          side: i % 2 === 0 ? 'accent accentA' : 'accent accentB'
+        })
+      }
+      that.records = rows
+      that.empty = rows.length === 0
+      that.count = rows.length + ' / ' + MAX_RECORDS
+    })
+  },
+
+  buzz(mode) {
+    try {
+      vibrator.vibrate({ mode: mode || 'short' })
+    } catch (e) {}
+  },
+
+  // 单击：把这条比分恢复到记分页
+  onPick(idx) {
+    const it = this.raw[idx]
+    if (!it) return
+    const that = this
+    saveScore(it.t, it.b)
+    requestScoreRefresh()
+    this.buzz('short')
+    setTimeout(function () {
+      try {
+        router.back()
+      } catch (e) {}
+    }, 80)
+  },
+
+  // 长按：删除这条
+  onDrop(idx) {
+    const it = this.raw[idx]
+    if (!it) return
+    const list = this.raw.slice(0)
+    list.splice(idx, 1)
+    this.raw = list
+    this.buzz('short')
+    saveRecords(list)
+    this.render()
+  },
+
+  // ---------- 手势：左 -> 右 返回记分页 ----------
+  onTouchStart(evt) {
+    this.startPoint = coord(evt)
+  },
+
+  onTouchEnd(evt) {
+    const start = this.startPoint
+    this.startPoint = null
+    const end = coord(evt)
+    if (!start || !end) return
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    if (Math.abs(dx) <= Math.abs(dy)) return
+    if (dx > 90) {
+      try {
+        router.back()
+      } catch (e) {}
+    }
+  }
+}
+</script>
+
+<style>
+.root {
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  background-color: #070e12;
+}
+
+.head {
+  height: 9%;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+.title {
+  font-size: 38px;
+  color: #d6e8eb;
+}
+
+.count {
+  font-size: 22px;
+  color: #6e8c9b;
+}
+
+.list {
+  height: 84%;
+}
+
+.item {
+  height: 96px;
+  margin-bottom: 12px;
+  flex-direction: row;
+  align-items: center;
+  border-width: 2px;
+  border-color: #1b2932;
+  border-radius: 26px;
+  background-color: #101c23;
+}
+
+.accent {
+  width: 9px;
+  height: 56px;
+  margin-left: 18px;
+  border-width: 2px;
+  border-radius: 8px;
+}
+
+.accentA {
+  background-color: #56d9ae;
+  border-color: #56d9ae;
+}
+
+.accentB {
+  background-color: #6cc5f3;
+  border-color: #6cc5f3;
+}
+
+.no {
+  width: 54px;
+  margin-left: 14px;
+  font-size: 24px;
+  color: #60808f;
+}
+
+.val {
+  width: 214px;
+  font-size: 46px;
+  font-weight: bold;
+  text-align: center;
+  color: #deeef5;
+}
+
+.time {
+  width: 118px;
+  margin-right: 20px;
+  font-size: 24px;
+  text-align: right;
+  color: #60808f;
+}
+
+.empty {
+  height: 120px;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyText {
+  font-size: 26px;
+  color: #4f6b78;
+}
+
+.foot {
+  height: 7%;
+  align-items: center;
+  justify-content: center;
+}
+
+.footText {
+  font-size: 22px;
+  color: #4f6b78;
+}
+</style>

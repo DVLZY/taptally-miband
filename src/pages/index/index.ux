@@ -1,59 +1,23 @@
 <template>
   <div class="root" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="half halfTop" onclick="onTop" onlongpress="onTopLong">
+    <div class="card cardTop" onclick="onTop" onlongpress="onTopLong">
       <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
-    <div class="bar">
-      <text class="tip">{{bar}}</text>
+    <div class="mid">
+      <text class="midText">{{mid}}</text>
     </div>
-    <div class="half halfBottom" onclick="onBottom" onlongpress="onBottomLong">
-      <text class="score scoreBottom" style="font-size: {{fsBottom}}px">{{bottom}}</text>
+    <div class="card cardBot" onclick="onBottom" onlongpress="onBottomLong">
+      <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
     </div>
   </div>
 </template>
 
 <script>
 import vibrator from '@system.vibrator'
-import storage from '@system.storage'
-import file from '@system.file'
 import router from '@system.router'
+import { loadScore, saveScore, addRecord, consumeScoreRefresh } from '../../common/store.js'
 
-// 主存储：偏好存储；兜底：应用私有文件（两者都写、都读，任一可用即可恢复）
-const STORE_KEY = 'taptally_v1'
-const FILE_URI = 'internal://files/taptally-score.txt'
-
-// 同一应用进程内的缓存：返回再进时无需等异步读取
 let bootScore = null
-
-// 兼容 success 回调的多种形态：原始字符串 / {value} / {data}
-function pickValue(data) {
-  if (data === undefined || data === null) return null
-  if (typeof data === 'string') return data
-  if (typeof data === 'object') {
-    if (data.value !== undefined && data.value !== null) return String(data.value)
-    if (data.data !== undefined && data.data !== null) return String(data.data)
-    try {
-      return JSON.stringify(data)
-    } catch (e) {
-      return null
-    }
-  }
-  return String(data)
-}
-
-// "12-9" -> { t:12, b:9 }，非法返回 null
-function parseScore(raw) {
-  if (raw === undefined || raw === null) return null
-  const s = String(raw).trim()
-  if (!s) return null
-  const parts = s.split('-')
-  if (parts.length !== 2) return null
-  const t = parseInt(parts[0], 10)
-  const b = parseInt(parts[1], 10)
-  if (isNaN(t) || isNaN(b)) return null
-  if (t < 0 || b < 0 || t > 999 || b > 999) return null
-  return { t: t, b: b }
-}
 
 function coord(evt) {
   let t = evt
@@ -74,20 +38,18 @@ export default {
   private: {
     top: '0',
     bottom: '0',
-    fsTop: 300,
-    fsBottom: 300,
-    bar: '',
+    fsTop: 400,
+    fsBot: 400,
+    mid: '',
     armed: false
   },
 
   onInit() {
     this.pendingTimer = 0
     this.armTimer = 0
-    this.hydroTimer = 0
     this.startPoint = null
     this.restored = false
     this.touched = false
-    this.lastSaved = ''
     if (bootScore) {
       this.restored = true
       this.applyScore(bootScore.t, bootScore.b, false)
@@ -98,12 +60,14 @@ export default {
     this.restore()
   },
 
-  // 从后台/其他应用回来后，若之前没恢复成功再试一次
+  // 从列表页恢复或从后台回来时重新读一次
   onShow() {
-    if (!this.restored) this.restore()
+    if (!this.restored || consumeScoreRefresh()) {
+      this.restored = false
+      this.restore()
+    }
   },
 
-  // 退到后台时补一次写入
   onHide() {
     this.saveNow()
   },
@@ -112,64 +76,19 @@ export default {
     this.saveNow()
     if (this.pendingTimer) clearTimeout(this.pendingTimer)
     if (this.armTimer) clearTimeout(this.armTimer)
-    if (this.hydroTimer) clearTimeout(this.hydroTimer)
   },
 
-  // ---------- 读取 ----------
+  // ---------- 读取 / 应用 ----------
   restore() {
     const that = this
-    if (this.restored) return
-    let pending = 2
-    let best = null
-    let finished = false
-
-    const finish = function () {
-      if (finished) return
-      finished = true
+    loadScore(function (sc) {
       that.restored = true
-      if (best) {
-        that.applyScore(best.t, best.b, true)
+      if (sc) {
+        that.applyScore(sc.t, sc.b, true)
       } else {
-        that.lastSaved = that.top + '-' + that.bottom
+        that.syncFont()
       }
-    }
-    const take = function (raw) {
-      if (!best) best = parseScore(raw)
-      pending--
-      if (pending <= 0) finish()
-    }
-    const skip = function () {
-      pending--
-      if (pending <= 0) finish()
-    }
-
-    try {
-      storage.get({
-        key: STORE_KEY,
-        success: function (data) {
-          take(pickValue(data))
-        },
-        fail: function () {
-          skip()
-        }
-      })
-    } catch (e) {
-      skip()
-    }
-
-    try {
-      file.readText({
-        uri: FILE_URI,
-        success: function (data) {
-          take(data && data.text)
-        },
-        fail: function () {
-          skip()
-        }
-      })
-    } catch (e) {
-      skip()
-    }
+    })
   },
 
   applyScore(t, b, defer) {
@@ -177,15 +96,14 @@ export default {
     const tt = t < 0 ? 0 : t
     const bb = b < 0 ? 0 : b
     bootScore = { t: tt, b: bb }
-    this.lastSaved = tt + '-' + bb
     const apply = function () {
       that.top = String(tt)
       that.bottom = String(bb)
       that.syncFont()
     }
     apply()
-    // 兜底：防止框架用初始值重绘把异步恢复的结果盖掉（用户已操作过就不再回写）
     if (defer) {
+      // 防止框架用初始值重绘把异步恢复的结果盖掉
       setTimeout(function () {
         if (!that.touched) apply()
       }, 150)
@@ -194,36 +112,16 @@ export default {
 
   // ---------- 写入 ----------
   save() {
-    const v = this.top + '-' + this.bottom
-    if (v === this.lastSaved) return
-    this.lastSaved = v
     bootScore = { t: this.num(this.top), b: this.num(this.bottom) }
-    this.writeStorage(v)
-    this.writeFile(v)
+    saveScore(bootScore.t, bootScore.b)
   },
 
-  // 退出/切后台时无条件补写一次
   saveNow() {
-    const v = this.top + '-' + this.bottom
-    this.lastSaved = v
     bootScore = { t: this.num(this.top), b: this.num(this.bottom) }
-    this.writeStorage(v)
-    this.writeFile(v)
+    saveScore(bootScore.t, bootScore.b)
   },
 
-  writeStorage(v) {
-    try {
-      storage.set({ key: STORE_KEY, value: v })
-    } catch (e) {}
-  },
-
-  writeFile(v) {
-    try {
-      file.writeText({ uri: FILE_URI, text: v })
-    } catch (e) {}
-  },
-
-  // ---------- 基础能力 ----------
+  // ---------- 基础 ----------
   buzz(mode) {
     try {
       vibrator.vibrate({ mode: mode || 'short' })
@@ -243,12 +141,16 @@ export default {
     return isNaN(n) ? 0 : n
   },
 
-  // 位数越多字越小，避免 3 位数溢出（设计宽 480）
+  // 数字越大字越大；3 位数收小，避免溢出卡片
+  sizeFor(n) {
+    if (n >= 100) return 210
+    if (n >= 10) return 350
+    return 400
+  },
+
   syncFont() {
-    const ft = this.num(this.top)
-    const fb = this.num(this.bottom)
-    this.fsTop = ft >= 100 ? 200 : 300
-    this.fsBottom = fb >= 100 ? 200 : 300
+    this.fsTop = this.sizeFor(this.num(this.top))
+    this.fsBot = this.sizeFor(this.num(this.bottom))
   },
 
   add(side) {
@@ -315,20 +217,16 @@ export default {
     this.minus('bottom')
   },
 
-  // ---------- 上滑重置（二次确认）----------
-  setBar(s) {
-    this.bar = s
-  },
-
+  // ---------- 上滑两次：存记录 + 归零 ----------
   resetFlow() {
     const that = this
     if (!this.armed) {
       this.armed = true
-      this.setBar('再滑确认')
+      this.mid = '再滑确认'
       this.buzz('short')
       this.armTimer = setTimeout(function () {
         that.armed = false
-        that.setBar('')
+        that.mid = ''
         that.armTimer = 0
       }, 2500)
       return
@@ -336,13 +234,19 @@ export default {
     if (this.armTimer) clearTimeout(this.armTimer)
     this.armTimer = 0
     this.armed = false
+    const t = this.num(this.top)
+    const b = this.num(this.bottom)
+    // 0:0 不入列表
+    if (t > 0 || b > 0) {
+      addRecord(t, b)
+    }
     this.touched = true
     this.top = '0'
     this.bottom = '0'
     this.syncFont()
     this.buzzDouble()
     this.save()
-    this.setBar('')
+    this.mid = ''
   },
 
   // ---------- 手势 ----------
@@ -357,15 +261,27 @@ export default {
     if (!start || !end) return
     const dx = end.x - start.x
     const dy = end.y - start.y
-    if (dx > 90 && Math.abs(dy) < 90) {
-      this.saveNow()
-      try {
-        router.back()
-      } catch (e) {}
+    // 横向：左 -> 右，退出
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 90) {
+        this.saveNow()
+        try {
+          router.back()
+        } catch (e) {}
+      }
       return
     }
-    if (dy < -90 && Math.abs(dx) < 90) {
+    // 上滑：重置（两次确认）
+    if (dy < -90) {
       this.resetFlow()
+      return
+    }
+    // 下滑：进入记分列表
+    if (dy > 90) {
+      this.saveNow()
+      try {
+        router.push({ uri: '/pages/history' })
+      } catch (e) {}
     }
   }
 }
@@ -376,47 +292,49 @@ export default {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background-color: #000000;
+  padding: 14px;
+  background-color: #070e12;
 }
 
-.half {
+.card {
   height: 48%;
+  align-items: center;
+  justify-content: center;
+  border-width: 2px;
+  border-radius: 52px;
+}
+
+.cardTop {
+  background-color: #7fd9b7;
+  border-color: #9ff0d5;
+}
+
+.cardBot {
+  background-color: #92cdf5;
+  border-color: #bfe6ff;
+}
+
+.mid {
+  height: 4%;
   align-items: center;
   justify-content: center;
 }
 
-.halfTop {
-  background-color: #a8e6cf;
-}
-
-.halfBottom {
-  background-color: #b3e5fc;
+.midText {
+  font-size: 24px;
+  color: #5fc9a6;
 }
 
 .score {
-  font-size: 300px;
   font-weight: bold;
   text-align: center;
 }
 
 .scoreTop {
-  color: #0b6b4f;
+  color: #06402c;
 }
 
-.scoreBottom {
-  color: #0b4f6b;
-}
-
-.bar {
-  height: 4%;
-  align-items: center;
-  justify-content: center;
-  background-color: #101a1e;
-}
-
-.tip {
-  font-size: 26px;
-  color: #7ee0c0;
-  text-align: center;
+.scoreBot {
+  color: #063a55;
 }
 </style>
