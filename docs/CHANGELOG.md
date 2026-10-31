@@ -108,3 +108,26 @@
 - 图标四周加 **12% 透明留白**：手环列表按圆形裁切，之前画满导致视觉上「比原生图标大一圈、把应用名挤下去」
 - 数字改为**按内圆等比缩放**（`k = 1 - 2×pad_ratio`），留白加大后数字自动跟着收，不会压出圆弧
 - 新增 `publish/gen_launcher_preview.py` 与 `publish/icon-padding-compare.png`（0%/6%/10%/14% 留白对比）
+
+## 1.5.0（versionCode 18）
+
+### 修「历史只剩 1 条」
+- 新增**追加日志**通道 `internal://files/taptally-records.log`：加记录时先 append 一行，
+  **写入不需要先读**，所以无论读取通道是否可靠都不会覆盖历史
+- `addRecord` 改为「先 append → 更新缓存并先写一次 → 再异步读全量合并重写」；
+  1.3.x 的「读全量→合并→覆盖写」在页面首次加记录（缓存为空、读回为空）时会把历史覆盖成 1 条
+- `loadRecords` 三通道合并去重（日志 / 偏好存储 / 整份文件），时间倒序取前 5
+- 记分页 `onReady` 预热记录缓存
+
+### 修「首帧直角闪一下」
+- 卡片圆角不再用内联数据绑定（绑定值首帧为空会覆盖成 0），改用类名 `cardPill`，
+  `.card`/`.cardTop`/`.cardBot` 各自写死 `border-radius: 52px` 兜底；列表条目同理（`itemPill`）
+
+### 交互调整
+- **取消双击减分**：单击立即 +1（不再等 300ms），减一改为**长按**半区
+- 长按后系统补发的 click 用 `longMark` 丢弃，不会「先减一后加一」
+
+### 工具链教训
+- aiot-toolkit 遇到语法错误的模块**不报错**，直接编译成空模块
+  （bundle 里变成 `"./src/common/store.js" () {}`），页面照常渲染但数据层静默失效
+- 新增 `scripts/check_syntax.py`：build 前把所有 .ux 的 `<script>` 与 .js 抽出来跑 `node --check`

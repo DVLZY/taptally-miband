@@ -14,11 +14,15 @@ const SCORE_KEY = 'taptally_v1'
 const SCORE_FILE = 'internal://files/taptally-score.txt'
 const RECORD_KEY = 'taptally_records_v1'
 const RECORD_FILE = 'internal://files/taptally-records.txt'
+// 追加日志：每条记录单独 append 一行，写的时候不需要先读
+// 这是「历史只剩 1 条」的根治手段——原实现每次都要「读全量→合并→覆盖写」，
+// 只要那一次读取拿到旧值/空值，旧记录就被覆盖掉了；追加永不覆盖。
+const RECORD_LOG = 'internal://files/taptally-records.log'
 
 export const MAX_RECORDS = 5
 
 // 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
-export const APP_VERSION = '1.4.1'
+export const APP_VERSION = '1.5.0'
 
 // 内存缓存
 let scoreCache = null // { t, b }
@@ -127,15 +131,19 @@ export function loadScore(cb, force) {
 }
 
 // ---------- 历史记录 ----------
-// 落盘格式："12-9-1699000000000;7-11-1699000000001"
+// 三通道并行：追加日志 RECORD_LOG（只追加，不读即写）+ 偏好存储 + 整份文件
+// 任一通道能读到就合并，按 (t,b,ts) 去重，时间倒序，取前 MAX_RECORDS 条
 function parseRecords(raw) {
   if (!raw) return null
   const s = String(raw).trim()
   if (!s) return null
-  const segs = s.split(';')
+  // 日志每行一条、整份文件分号分隔，两种都吃（不用正则，避开转义坑）
+  const nl = String.fromCharCode(10)
+  const cr = String.fromCharCode(13)
+  const segs = s.split(nl).join(';').split(cr).join(';').split(';').join(',').split(',')
   const out = []
   for (let i = 0; i < segs.length; i++) {
-    const seg = segs[i].trim()
+    const seg = String(segs[i]).trim()
     if (!seg) continue
     const p = seg.split('-')
     if (p.length < 2) continue
@@ -164,6 +172,51 @@ function clone(list) {
   return out
 }
 
+// 按 (t,b,ts) 去重 + 时间倒序 + 截断
+function normalize(lists) {
+  const seen = {}
+  const out = []
+  for (let i = 0; i < lists.length; i++) {
+    const arr = lists[i]
+    if (!arr) continue
+    for (let k = 0; k < arr.length; k++) {
+      const r = arr[k]
+      const key = r.t + '-' + r.b + '-' + (r.ts || 0)
+      if (seen[key]) continue
+      seen[key] = 1
+      out.push({ t: r.t, b: r.b, ts: r.ts || 0 })
+    }
+  }
+  out.sort(function (a, b) {
+    return (b.ts || 0) - (a.ts || 0)
+  })
+  return out.slice(0, MAX_RECORDS)
+}
+
+// 读一条额外通道（日志用 readText，其余同 readBoth）
+function readLog(cb) {
+  try {
+    file.readText({
+      uri: RECORD_LOG,
+      success: function (data) {
+        cb(data && data.text ? String(data.text) : null)
+      },
+      fail: function () {
+        cb(null)
+      }
+    })
+  } catch (e) {
+    cb(null)
+  }
+}
+
+// 追加一行；append 不受支持时会退化成覆盖（那也只丢日志通道，另外两通道还在）
+function appendLine(line) {
+  try {
+    file.writeText({ uri: RECORD_LOG, text: line + String.fromCharCode(10), append: true, fail: function () {} })
+  } catch (e) {}
+}
+
 export function loadRecords(cb, force) {
   if (recordCache && !force) {
     const c = clone(recordCache)
@@ -173,32 +226,43 @@ export function loadRecords(cb, force) {
     return
   }
   readBoth(RECORD_KEY, RECORD_FILE, function (out) {
-    const disk = parseRecords(out.s) || parseRecords(out.f)
-    // force 回读时：磁盘为空但缓存有数据，说明回读不可靠，保留缓存
-    if (disk && (disk.length >= (recordCache ? recordCache.length : 0))) {
-      recordCache = clone(disk)
-    } else if (!recordCache) {
-      recordCache = []
-    }
-    cb(clone(recordCache))
+    const fromStore = parseRecords(out.s)
+    const fromFile = parseRecords(out.f)
+    readLog(function (logText) {
+      const fromLog = parseRecords(logText)
+      recordCache = normalize([recordCache, fromLog, fromStore, fromFile])
+      cb(clone(recordCache))
+    })
   })
 }
 
 export function saveRecords(list) {
-  recordCache = clone(list)
-  writeBoth(RECORD_KEY, RECORD_FILE, serialize(list))
+  recordCache = normalize([list])
+  const text = serialize(recordCache)
+  writeBoth(RECORD_KEY, RECORD_FILE, text)
+  // 删除/清空后必须把日志也重写成最终结果，否则下次合并会把删掉的条目捞回来
+  try {
+    file.writeText({ uri: RECORD_LOG, text: text ? text + String.fromCharCode(10) : '' })
+  } catch (e) {}
 }
 
-// 新增一条：最新在前，最多 MAX_RECORDS 条
+// 新增一条：
+//   1) 先 append 一行到日志（不需要读，绝不会覆盖旧记录）
+//   2) 同步更新内存缓存并先写一次（本会话内立即生效）
+//   3) 再异步把「日志 + 存储 + 文件」读回来的全量合并重写一次（跨页/跨会话也在）
+// 旧实现是「读全量 → 合并 → 覆盖写」，页面第一次加记录时缓存还是空的，
+// 读回来的可能只有 1 条，于是把历史覆盖成 1 条 —— 这就是「历史只剩 1 条」的根因。
 export function addRecord(t, b, cb) {
+  const entry = { t: t, b: b, ts: now() }
+  appendLine(entry.t + '-' + entry.b + '-' + entry.ts)
+  recordCache = normalize([[entry], recordCache || []])
+  writeBoth(RECORD_KEY, RECORD_FILE, serialize(recordCache))
+  const snapshot = clone(recordCache)
+  if (cb) cb(snapshot)
   loadRecords(function (list) {
-    const next = [{ t: t, b: b, ts: now() }]
-    for (let i = 0; i < list.length && i < MAX_RECORDS - 1; i++) {
-      next.push(list[i])
-    }
-    saveRecords(next)
-    if (cb) cb(clone(next))
-  })
+    recordCache = normalize([recordCache, list])
+    writeBoth(RECORD_KEY, RECORD_FILE, serialize(recordCache))
+  }, true)
 }
 
 // 删除第 idx 条
@@ -214,16 +278,16 @@ export function removeRecord(idx, cb) {
   })
 }
 
-// 诊断：返回三条通道里各自看到的东西，供页面直接显示
-//   s = 偏好存储里的原始字符串，f = 文件里的原始字符串，c = 内存缓存条数
+// 诊断：三条通道各读到多少字符 + 内存条数，页面直接显示，用来定位「历史只有 1 条」
 export function debugStats(cb) {
   readBoth(RECORD_KEY, RECORD_FILE, function (out) {
-    cb({
-      s: out.s === null ? 'null' : String(out.s).length,
-      f: out.f === null ? 'null' : String(out.f).length,
-      c: recordCache ? recordCache.length : -1,
-      rawS: out.s === null ? '' : String(out.s),
-      rawF: out.f === null ? '' : String(out.f)
+    readLog(function (logText) {
+      cb({
+        s: out.s === null ? 'null' : String(out.s).length,
+        f: out.f === null ? 'null' : String(out.f).length,
+        l: logText === null ? 'null' : String(logText).length,
+        c: recordCache ? recordCache.length : -1
+      })
     })
   })
 }

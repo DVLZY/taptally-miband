@@ -4,7 +4,7 @@
       <text class="title" style="font-size: {{titleFs}}px" onlongpress="onTitleLong">记录</text>
     </div>
     <scroll class="list" scroll-y="true">
-      <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px; border-radius: {{itemR}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
+      <div class="item {{itemCls}}" for="{{records}}" tid="id" style="height: {{itemH}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
         <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px">{{$item.no}}</text>
         <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px; margin-right: {{accentMr}}px"></div>
         <text class="val" style="font-size: {{valFs}}px; width: {{valW}}px">{{$item.score}}</text>
@@ -59,7 +59,6 @@ function metricsOf(w, h, shape) {
   return {
     pad: pad,
     itemH: itemH,
-    itemR: Math.round(itemH * 0.24),
     barH: Math.round(itemH * 0.52),
     valFs: Math.round(itemH * 0.66),
     noFs: Math.max(20, Math.round(itemH * 0.40)),
@@ -79,7 +78,7 @@ export default {
     empty: true,
     pad: 14,
     itemH: 126,
-    itemR: 30,
+    itemCls: '',
     barH: 66,
     valFs: 83,
     noFs: 50,
@@ -90,8 +89,8 @@ export default {
     noW: 50,
     valW: 300,
     footFs: 22,
-    foot: 'v' + APP_VERSION + ' · 单击恢复 / 长按删除',
-    dbgOn: false
+    foot: 'v' + APP_VERSION,
+    dbgOn: true
   },
 
   onInit() {
@@ -129,7 +128,7 @@ export default {
     const m = metricsOf(w, h, shape)
     this.pad = m.pad
     this.itemH = m.itemH
-    this.itemR = m.itemR
+    this.itemCls = (shape === 'rect' || !shape) ? '' : 'itemPill'
     this.barH = m.barH
     this.valFs = m.valFs
     this.noFs = m.noFs
@@ -145,16 +144,8 @@ export default {
   // 长按标题：在页脚切换显示诊断数字
   // S/F = 偏好存储 / 文件里读到多少字符（null 表示读不到），N = 内存里几条
   onTitleLong() {
-    const that = this
     this.buzz('short')
-    this.dbgOn = !this.dbgOn
-    if (!this.dbgOn) {
-      this.foot = 'v' + APP_VERSION + ' · 单击恢复 / 长按删除'
-      return
-    }
-    debugStats(function (st) {
-      that.foot = 'S' + st.s + ' F' + st.f + ' N' + st.c
-    })
+    this.foot = '单击恢复 / 长按删除'
   },
 
   // 时间降序：最新的一局在最上面
@@ -177,6 +168,10 @@ export default {
       }
       that.records = rows
       that.empty = rows.length === 0
+      // 诊断常显：S/F = 偏好存储与文件里读到多少字符，L = 追加日志字符数，N = 内存条数
+      debugStats(function (st) {
+        that.foot = 'v' + APP_VERSION + ' S' + st.s + ' F' + st.f + ' L' + st.l + ' N' + st.c
+      })
     })
   },
 
@@ -264,6 +259,10 @@ export default {
 
 .list {
   height: 82%;
+}
+
+.itemPill {
+  border-radius: 1000px;
 }
 
 .item {

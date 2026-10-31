@@ -1,12 +1,12 @@
 <template>
   <div class="root" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="card cardTop" style="border-radius: {{radius}}px" onclick="onTop" onlongpress="onTopLong">
+    <div class="card cardTop {{cardCls}}" onclick="onTop" onlongpress="onTopLong">
       <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
     <div class="mid" onlongpress="onMidLong">
       <text class="midText" style="font-size: {{midFs}}px">{{mid}}</text>
     </div>
-    <div class="card cardBot" style="border-radius: {{radius}}px" onclick="onBottom" onlongpress="onBottomLong">
+    <div class="card cardBot {{cardCls}}" onclick="onBottom" onlongpress="onBottomLong">
       <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
     </div>
   </div>
@@ -47,8 +47,7 @@ function metricsOf(w, h, shape) {
   const gap = Math.round(dh * 0.04)
   const cardH = (dh - pad * 2 - gap) / 2
   const cardW = dw - pad * 2
-  const radius = shape === 'rect' ? 52 : Math.round(cardH / 2)
-  return { dh: dh, pad: pad, cardH: cardH, cardW: cardW, radius: radius }
+  return { dh: dh, pad: pad, cardH: cardH, cardW: cardW }
 }
 
 export default {
@@ -58,14 +57,13 @@ export default {
     fsTop: 362,
     fsBot: 425,
     pad: 14,
-    radius: 52,
+    cardCls: '',
     midFs: 24,
     mid: '',
     armed: false
   },
 
   onInit() {
-    this.pendingTimer = 0
     this.armTimer = 0
     this.startPoint = null
     this.restored = false
@@ -82,6 +80,8 @@ export default {
   onReady() {
     this.syncDevice()
     this.restore(false)
+    // 预热历史记录缓存：加记录时才能合并出完整历史，而不是覆盖成 1 条
+    loadRecords(function () {})
   },
 
   // 从列表页返回时**一定**强制回读一次磁盘：列表页可能刚把另一局的比分写进去
@@ -105,7 +105,6 @@ export default {
 
   onDestroy() {
     this.saveNow()
-    if (this.pendingTimer) clearTimeout(this.pendingTimer)
     if (this.armTimer) clearTimeout(this.armTimer)
   },
 
@@ -153,22 +152,33 @@ export default {
     this.devShape = shape || 'rect'
     this.metrics = metricsOf(w, h, shape)
     this.pad = this.metrics.pad
-    this.radius = this.metrics.radius
+    this.cardCls = (shape === 'rect' || !shape) ? '' : 'cardPill'
     this.midFs = Math.max(18, Math.round(this.metrics.dh * 0.0196))
     this.syncFont()
   },
 
   // ---------- 读取 / 应用 ----------
+  // force=true 用于「从列表页恢复比分」：磁盘写入是异步的，一次读不到就重试几次，
+  // 否则会出现「跳回来了但比分没变」。
   restore(force) {
     const that = this
-    loadScore(function (sc) {
-      that.restored = true
-      if (sc) {
-        that.applyScore(sc.t, sc.b, true)
-      } else {
+    const attempt = function (left) {
+      loadScore(function (sc) {
+        that.restored = true
+        if (sc) {
+          that.applyScore(sc.t, sc.b, true)
+          return
+        }
+        if (left > 1) {
+          setTimeout(function () {
+            attempt(left - 1)
+          }, 150)
+          return
+        }
         that.syncFont()
-      }
-    }, !!force)
+      }, true)
+    }
+    attempt(force ? 4 : 1)
   },
 
   applyScore(t, b, defer) {
@@ -258,34 +268,14 @@ export default {
     this.save()
   },
 
+  // 单击：立即 +1（不再等 300ms 判双击）
   tap(side) {
-    const that = this
-    // 长按已经减过分：这次触摸的 click 直接丢掉，避免"先减一后加一"
-    if (this.longMark || this.suppress) {
-      this.suppress = false
+    // 长按已经减过分：这次触摸派发的 click 直接丢掉，避免"先减一后加一"
+    if (this.longMark) {
+      this.longMark = false
       return
     }
-    if (this.pendingTimer && this.pendingSide === side) {
-      clearTimeout(this.pendingTimer)
-      this.pendingTimer = 0
-      this.pendingSide = ''
-      this.minus(side)
-      return
-    }
-    if (this.pendingTimer) {
-      clearTimeout(this.pendingTimer)
-      this.pendingTimer = 0
-      const prev = this.pendingSide
-      this.pendingSide = ''
-      if (prev) this.add(prev)
-    }
-    this.pendingSide = side
-    this.pendingTimer = setTimeout(function () {
-      that.pendingTimer = 0
-      const s = that.pendingSide
-      that.pendingSide = ''
-      if (s) that.add(s)
-    }, 300)
+    this.add(side)
   },
 
   onTop(evt) {
@@ -297,27 +287,15 @@ export default {
   },
 
   // 长按 = 减分。注意：长按之后系统还会再派发一次 click，
-  // 这里先取消挂起的单击、并打上 longMark，让 tap() 忽略这次点击
+  // 打上 longMark：长按之后系统还会补发一次 click，tap() 见到标记直接丢掉
   onTopLong(evt) {
-    this.cancelPendingTap()
     this.longMark = true
-    this.suppress = true
     this.minus('top')
   },
 
   onBottomLong(evt) {
-    this.cancelPendingTap()
     this.longMark = true
-    this.suppress = true
     this.minus('bottom')
-  },
-
-  cancelPendingTap() {
-    if (this.pendingTimer) {
-      clearTimeout(this.pendingTimer)
-      this.pendingTimer = 0
-    }
-    this.pendingSide = ''
   },
 
   // ---------- 上滑两次：存记录 + 归零 ----------
@@ -361,7 +339,6 @@ export default {
     this.startPoint = coord(evt)
     // 新的一次触摸：清掉上一次的长按标记
     this.longMark = false
-    this.suppress = false
   },
 
   onTouchEnd(evt) {
@@ -415,14 +392,20 @@ export default {
   border-radius: 52px;
 }
 
+.cardPill {
+  border-radius: 1000px;
+}
+
 .cardTop {
   background-color: #7fd9b7;
   border-color: #9ff0d5;
+  border-radius: 52px;
 }
 
 .cardBot {
   background-color: #92cdf5;
   border-color: #bfe6ff;
+  border-radius: 52px;
 }
 
 .mid {
