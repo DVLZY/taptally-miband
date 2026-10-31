@@ -9,10 +9,9 @@
         <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px"></div>
         <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px; margin-left: {{noMl}}px">{{$item.no}}</text>
         <text class="val" style="font-size: {{valFs}}px; width: {{valW}}px">{{$item.score}}</text>
-        <text class="time" style="font-size: {{noFs}}px; width: {{timeW}}px; margin-right: {{timeMr}}px">{{$item.time}}</text>
       </div>
       <div class="empty" if="{{empty}}">
-        <text class="emptyText">还没有记录</text>
+        <text class="emptyText" style="font-size: {{noFs}}px">还没有记录</text>
       </div>
     </scroll>
     <div class="foot">
@@ -25,7 +24,9 @@
 import vibrator from '@system.vibrator'
 import router from '@system.router'
 import device from '@system.device'
-import { loadRecords, saveRecords, saveScore, requestScoreRefresh, formatTime, MAX_RECORDS } from '../../common/store.js'
+import { loadRecords, saveRecords, saveScore, requestScoreRefresh, MAX_RECORDS } from '../../common/store.js'
+
+const DESIGN_W = 480
 
 function coord(evt) {
   let t = evt
@@ -42,37 +43,32 @@ function coord(evt) {
   return { x: x, y: y }
 }
 
-const DESIGN_W = 480
-
+// 只展示「序号 + 比分」，行高比带时间那版更大
 function metricsOf(w, h, shape) {
   const dw = DESIGN_W
   const dh = dw * h / w
   let pad = 10
   if (shape === 'circle') pad = Math.round(dw * 0.1465)
   else if (shape === 'pill-shaped') pad = 14
-  const itemH = Math.max(56, Math.min(120, Math.round(dh * 0.078)))
-  const accentW = Math.max(6, Math.round(itemH * 0.09))
-  const accentMl = Math.round(itemH * 0.19)
-  const noW = Math.round(itemH * 0.34)
-  const noMl = Math.round(itemH * 0.10)
-  const timeW = Math.round(itemH * 0.78)
-  const timeMr = Math.round(itemH * 0.12)
-  const valW = dw - pad * 2 - (accentW + accentMl) - (noW + noMl) - (timeW + timeMr)
+  const itemH = Math.max(60, Math.min(132, Math.round(dh * 0.092)))
+  const accentW = Math.max(6, Math.round(itemH * 0.085))
+  const accentMl = Math.round(itemH * 0.20)
+  const noW = Math.round(itemH * 0.36)
+  const noMl = Math.round(itemH * 0.12)
+  const valW = dw - pad * 2 - (accentW + accentMl) - (noW + noMl) - Math.round(itemH * 0.10)
   return {
     pad: pad,
     itemH: itemH,
-    itemR: Math.round(itemH * 0.27),
-    barH: Math.round(itemH * 0.58),
-    valFs: Math.round(itemH * 0.48),
-    noFs: Math.max(16, Math.round(itemH * 0.25)),
-    titleFs: Math.max(20, Math.round(dh * 0.031)),
+    itemR: Math.round(itemH * 0.26),
+    barH: Math.round(itemH * 0.55),
+    valFs: Math.round(itemH * 0.54),
+    noFs: Math.max(16, Math.round(itemH * 0.26)),
+    titleFs: Math.max(20, Math.round(dh * 0.032)),
     accentW: accentW,
     accentMl: accentMl,
     noW: noW,
     noMl: noMl,
-    valW: valW < 60 ? 60 : valW,
-    timeW: timeW,
-    timeMr: timeMr
+    valW: valW < 80 ? 80 : valW
   }
 }
 
@@ -82,19 +78,17 @@ export default {
     count: '',
     empty: true,
     pad: 10,
-    itemH: 96,
-    itemR: 26,
-    barH: 56,
-    valFs: 46,
-    noFs: 24,
-    titleFs: 38,
-    accentW: 9,
-    accentMl: 18,
-    noW: 33,
-    noMl: 10,
-    valW: 240,
-    timeW: 75,
-    timeMr: 12
+    itemH: 112,
+    itemR: 29,
+    barH: 62,
+    valFs: 60,
+    noFs: 29,
+    titleFs: 39,
+    accentW: 10,
+    accentMl: 22,
+    noW: 40,
+    noMl: 13,
+    valW: 300
   },
 
   onInit() {
@@ -109,6 +103,10 @@ export default {
 
   onShow() {
     this.render()
+  },
+
+  onDestroy() {
+    this.raw = []
   },
 
   syncDevice() {
@@ -138,26 +136,23 @@ export default {
     this.noW = m.noW
     this.noMl = m.noMl
     this.valW = m.valW
-    this.timeW = m.timeW
-    this.timeMr = m.timeMr
   },
 
-  onDestroy() {
-    this.raw = []
-  },
-
+  // 时间降序：最新的一局在最上面
   render() {
     const that = this
     loadRecords(function (list) {
-      that.raw = list || []
+      const arr = (list || []).slice(0)
+      arr.sort(function (a, b) {
+        return (b.ts || 0) - (a.ts || 0)
+      })
+      that.raw = arr
       const rows = []
-      for (let i = 0; i < that.raw.length; i++) {
-        const it = that.raw[i]
+      for (let i = 0; i < arr.length; i++) {
         rows.push({
-          id: 'r' + i,
+          id: 'r' + i + '_' + (arr[i].ts || 0),
           no: String(i + 1),
-          score: it.t + ':' + it.b,
-          time: formatTime(it.ts),
+          score: arr[i].t + ':' + arr[i].b,
           side: i % 2 === 0 ? 'accent accentA' : 'accent accentB'
         })
       }
@@ -177,7 +172,6 @@ export default {
   onPick(idx) {
     const it = this.raw[idx]
     if (!it) return
-    const that = this
     saveScore(it.t, it.b)
     requestScoreRefresh()
     this.buzz('short')
@@ -227,7 +221,6 @@ export default {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  padding: 10px;
   background-color: #070e12;
 }
 
@@ -258,7 +251,6 @@ export default {
   align-items: center;
   border-width: 2px;
   border-color: #1b2932;
-  border-radius: 26px;
   background-color: #101c23;
 }
 
@@ -278,6 +270,7 @@ export default {
 }
 
 .no {
+  text-align: center;
   color: #60808f;
 }
 
@@ -287,19 +280,13 @@ export default {
   color: #deeef5;
 }
 
-.time {
-  text-align: right;
-  color: #60808f;
-}
-
 .empty {
-  height: 120px;
+  height: 140px;
   align-items: center;
   justify-content: center;
 }
 
 .emptyText {
-  font-size: 26px;
   color: #4f6b78;
 }
 
