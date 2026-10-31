@@ -49,14 +49,16 @@ def vgrad_circle(size, c_top, c_bot):
     return base.resize((size, size), Image.BILINEAR)
 
 
-def make_logo(size, ss=4, digit_fs=0.400, cx_top=0.418, cy_top=0.318, cx_bot=0.582, cy_bot=0.682):
-    """圆形图标：上绿下蓝**渐变**背景（无分隔线），0 在上、9 在下，数字大而靠拢。
+def make_logo(size, ss=4, digit_fs=0.400, stag=0.100, overlap=0.200):
+    """圆形图标：上绿下蓝竖向渐变（无分隔线）。
 
-    手环列表按圆形裁切，所以图形本身画成圆；数字全部落在圆内安全区。
+    数字布局按用户给的规则：
+      · 左右错开 20% —— 两个数字的中心水平相距 0.20×边长（各自 ±0.10）
+      · 上下重叠 20% —— 两个数字的字框竖直方向互相重叠 20% 字高
+    字高用 PIL 实测的字框高度，所以换字号也不会错位；内容全部落在圆形安全区内。
     """
     S = size * ss
-    grad = vgrad_circle(S, GREEN_C, BLUE_C)
-    grad = grad.convert("RGBA")
+    grad = vgrad_circle(S, GREEN_C, BLUE_C).convert("RGBA")
     mask = Image.new("L", (S, S), 0)
     pad = int(S * 0.005)
     ImageDraw.Draw(mask).ellipse([pad, pad, S - 1 - pad, S - 1 - pad], fill=255)
@@ -65,11 +67,15 @@ def make_logo(size, ss=4, digit_fs=0.400, cx_top=0.418, cy_top=0.318, cx_bot=0.5
 
     d = ImageDraw.Draw(img)
     font = ImageFont.truetype(FONT_B, int(S * digit_fs))
-    # 0 偏左上、9 偏右下：斜向错开，避免两个数字顶在一起
-    for txt, cx, cy, color in (("0", cx_top, cy_top, GREEN_TXT), ("9", cx_bot, cy_bot, BLUE_TXT)):
-        bb = d.textbbox((0, 0), txt, font=font)
-        w, h = bb[2] - bb[0], bb[3] - bb[1]
-        d.text((S * cx - w / 2 - bb[0], S * cy - h / 2 - bb[1]), txt, font=font, fill=color)
+    bb0 = d.textbbox((0, 0), "0", font=font)
+    bb9 = d.textbbox((0, 0), "9", font=font)
+    h = max(bb0[3] - bb0[1], bb9[3] - bb9[1])
+    dyc = 0.5 * (1.0 - overlap) * h       # 中心到中心的竖直距离
+    for txt, bb, cx, cy, color in (
+            ("0", bb0, 0.5 - stag, 0.5 - dyc / S, GREEN_TXT),
+            ("9", bb9, 0.5 + stag, 0.5 + dyc / S, BLUE_TXT)):
+        w, hh = bb[2] - bb[0], bb[3] - bb[1]
+        d.text((S * cx - w / 2 - bb[0], S * cy - hh / 2 - bb[1]), txt, font=font, fill=color)
     return img.resize((size, size), Image.LANCZOS)
 
 
