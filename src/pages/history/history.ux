@@ -1,7 +1,7 @@
 <template>
   <div class="root" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="head">
-      <text class="title" style="font-size: {{titleFs}}px">记录</text>
+      <text class="title" style="font-size: {{titleFs}}px" onlongpress="onTitleLong">记录</text>
     </div>
     <scroll class="list" scroll-y="true">
       <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px; border-radius: {{itemR}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
@@ -14,7 +14,7 @@
       </div>
     </scroll>
     <div class="foot">
-      <text class="footText" style="font-size: {{noFs}}px">单击恢复 · 长按删除</text>
+      <text class="footText" style="font-size: {{footFs}}px">{{foot}}</text>
     </div>
   </div>
 </template>
@@ -23,7 +23,7 @@
 import vibrator from '@system.vibrator'
 import router from '@system.router'
 import device from '@system.device'
-import { loadRecords, saveRecords, saveScore, MAX_RECORDS } from '../../common/store.js'
+import { loadRecords, saveRecords, saveScore, debugStats, MAX_RECORDS, APP_VERSION } from '../../common/store.js'
 
 const DESIGN_W = 480
 
@@ -64,6 +64,7 @@ function metricsOf(w, h, shape) {
     valFs: Math.round(itemH * 0.66),
     noFs: Math.max(20, Math.round(itemH * 0.40)),
     titleFs: Math.max(24, Math.round(dh * 0.036)),
+    footFs: Math.max(16, Math.round(dh * 0.018)),
     accentW: accentW,
     accentMl: accentMl,
     accentMr: accentMr,
@@ -87,7 +88,10 @@ export default {
     accentMl: 8,
     accentMr: 25,
     noW: 50,
-    valW: 300
+    valW: 300,
+    footFs: 22,
+    foot: 'v' + APP_VERSION + ' · 单击恢复 / 长按删除',
+    dbgOn: false
   },
 
   onInit() {
@@ -135,6 +139,22 @@ export default {
     this.accentMr = m.accentMr
     this.noW = m.noW
     this.valW = m.valW
+    this.footFs = m.footFs
+  },
+
+  // 长按标题：在页脚切换显示诊断数字
+  // S/F = 偏好存储 / 文件里读到多少字符（null 表示读不到），N = 内存里几条
+  onTitleLong() {
+    const that = this
+    this.buzz('short')
+    this.dbgOn = !this.dbgOn
+    if (!this.dbgOn) {
+      this.foot = 'v' + APP_VERSION + ' · 单击恢复 / 长按删除'
+      return
+    }
+    debugStats(function (st) {
+      that.foot = 'S' + st.s + ' F' + st.f + ' N' + st.c
+    })
   },
 
   // 时间降序：最新的一局在最上面

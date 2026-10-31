@@ -16,7 +16,7 @@
 import vibrator from '@system.vibrator'
 import router from '@system.router'
 import device from '@system.device'
-import { loadScore, saveScore, addRecord } from '../../common/store.js'
+import { loadScore, saveScore, addRecord, loadRecords, APP_VERSION } from '../../common/store.js'
 
 const DESIGN_W = 480
 let bootScore = null
@@ -109,17 +109,28 @@ export default {
     if (this.armTimer) clearTimeout(this.armTimer)
   },
 
-  // 中间横条长按：显示屏幕参数，便于在未适配机型上确认分辨率/形状
+  // 中间横条长按：显示「屏幕参数 + 版本号 + 已存记录条数」
+  // 换机型、确认装上的是哪一版、排查记录条数，都靠这一行
   onMidLong() {
     const that = this
-    const m = this.metrics || {}
-    this.mid = (this.devW || '?') + 'x' + (this.devH || '?') + ' ' + (this.devShape || '?')
     this.buzz('short')
+    loadRecords(function (list) {
+      that.showMid(
+        (that.devW || '?') + 'x' + (that.devH || '?') + ' ' + (that.devShape || '?') +
+        ' v' + APP_VERSION + ' r' + (list ? list.length : 0),
+        4000
+      )
+    }, true)
+  },
+
+  showMid(text, ms) {
+    const that = this
+    this.mid = text
     if (this.armTimer) clearTimeout(this.armTimer)
     this.armTimer = setTimeout(function () {
       that.mid = ''
       that.armTimer = 0
-    }, 3000)
+    }, ms || 3000)
   },
 
   // ---------- 屏幕自适应 ----------
@@ -318,6 +329,10 @@ export default {
     this.buzzDouble()
     this.save()
     this.mid = ''
+    const that2 = this
+    loadRecords(function (list) {
+      that2.showMid('已存 ' + (list ? list.length : 0) + ' 条', 1500)
+    }, true)
   },
 
   // ---------- 手势 ----------

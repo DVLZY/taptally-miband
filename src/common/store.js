@@ -17,6 +17,9 @@ const RECORD_FILE = 'internal://files/taptally-records.txt'
 
 export const MAX_RECORDS = 5
 
+// 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
+export const APP_VERSION = '1.3.3'
+
 // 内存缓存
 let scoreCache = null // { t, b }
 let recordCache = null // [{ t, b, ts }]
@@ -208,6 +211,20 @@ export function removeRecord(idx, cb) {
     list.splice(idx, 1)
     saveRecords(list)
     if (cb) cb(clone(list))
+  })
+}
+
+// 诊断：返回三条通道里各自看到的东西，供页面直接显示
+//   s = 偏好存储里的原始字符串，f = 文件里的原始字符串，c = 内存缓存条数
+export function debugStats(cb) {
+  readBoth(RECORD_KEY, RECORD_FILE, function (out) {
+    cb({
+      s: out.s === null ? 'null' : String(out.s).length,
+      f: out.f === null ? 'null' : String(out.f).length,
+      c: recordCache ? recordCache.length : -1,
+      rawS: out.s === null ? '' : String(out.s),
+      rawF: out.f === null ? '' : String(out.f)
+    })
   })
 }
 

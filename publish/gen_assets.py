@@ -152,8 +152,9 @@ def make_screen(scale=2):
 
 if __name__ == "__main__":
     os.makedirs(MEDIA, exist_ok=True)
-    make_logo(192).convert("RGBA").save(os.path.join(MEDIA, "icon.png"))
-    print("wrote media/icon.png 192x192")
+    # 官方模板的图标是 128x128；手环列表对小图更宽容，统一按 128 输出
+    make_logo(128).convert("RGBA").save(os.path.join(MEDIA, "icon.png"))
+    print("wrote media/icon.png 128x128")
     for s in (512, 256):
         p = os.path.join(HERE, "logo-%d.png" % s)
         make_logo(s).save(p)
