@@ -1,13 +1,13 @@
 <template>
   <div class="root" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="half halfTop" onclick="onTop" onlongpress="onTopLong">
-      <text class="score scoreTop">{{top}}</text>
+      <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
     <div class="bar">
       <text class="tip">{{bar}}</text>
     </div>
     <div class="half halfBottom" onclick="onBottom" onlongpress="onBottomLong">
-      <text class="score scoreBottom">{{bottom}}</text>
+      <text class="score scoreBottom" style="font-size: {{fsBottom}}px">{{bottom}}</text>
     </div>
   </div>
 </template>
@@ -15,9 +15,15 @@
 <script>
 import vibrator from '@system.vibrator'
 import storage from '@system.storage'
+import file from '@system.file'
 import router from '@system.router'
 
+// 主存储：偏好存储；兜底：应用私有文件（两者都写、都读，任一可用即可恢复）
 const STORE_KEY = 'taptally_v1'
+const FILE_URI = 'internal://files/taptally-score.txt'
+
+// 同一应用进程内的缓存：返回再进时无需等异步读取
+let bootScore = null
 
 // 兼容 success 回调的多种形态：原始字符串 / {value} / {data}
 function pickValue(data) {
@@ -26,7 +32,6 @@ function pickValue(data) {
   if (typeof data === 'object') {
     if (data.value !== undefined && data.value !== null) return String(data.value)
     if (data.data !== undefined && data.data !== null) return String(data.data)
-    if (data.key !== undefined) return null
     try {
       return JSON.stringify(data)
     } catch (e) {
@@ -34,6 +39,20 @@ function pickValue(data) {
     }
   }
   return String(data)
+}
+
+// "12-9" -> { t:12, b:9 }，非法返回 null
+function parseScore(raw) {
+  if (raw === undefined || raw === null) return null
+  const s = String(raw).trim()
+  if (!s) return null
+  const parts = s.split('-')
+  if (parts.length !== 2) return null
+  const t = parseInt(parts[0], 10)
+  const b = parseInt(parts[1], 10)
+  if (isNaN(t) || isNaN(b)) return null
+  if (t < 0 || b < 0 || t > 999 || b > 999) return null
+  return { t: t, b: b }
 }
 
 function coord(evt) {
@@ -55,81 +74,153 @@ export default {
   private: {
     top: '0',
     bottom: '0',
-    tip: '重置',
-    dbg: '',
-    bar: '重置',
-    pendingSide: '',
+    fsTop: 300,
+    fsBottom: 300,
+    bar: '',
     armed: false
   },
 
-  onReady() {
-    const that = this
+  onInit() {
     this.pendingTimer = 0
     this.armTimer = 0
+    this.hydroTimer = 0
     this.startPoint = null
-    this.setBar('R...')
+    this.restored = false
+    this.touched = false
+    this.lastSaved = ''
+    if (bootScore) {
+      this.restored = true
+      this.applyScore(bootScore.t, bootScore.b, false)
+    }
+  },
+
+  onReady() {
+    this.restore()
+  },
+
+  // 从后台/其他应用回来后，若之前没恢复成功再试一次
+  onShow() {
+    if (!this.restored) this.restore()
+  },
+
+  // 退到后台时补一次写入
+  onHide() {
+    this.saveNow()
+  },
+
+  onDestroy() {
+    this.saveNow()
+    if (this.pendingTimer) clearTimeout(this.pendingTimer)
+    if (this.armTimer) clearTimeout(this.armTimer)
+    if (this.hydroTimer) clearTimeout(this.hydroTimer)
+  },
+
+  // ---------- 读取 ----------
+  restore() {
+    const that = this
+    if (this.restored) return
+    let pending = 2
+    let best = null
+    let finished = false
+
+    const finish = function () {
+      if (finished) return
+      finished = true
+      that.restored = true
+      if (best) {
+        that.applyScore(best.t, best.b, true)
+      } else {
+        that.lastSaved = that.top + '-' + that.bottom
+      }
+    }
+    const take = function (raw) {
+      if (!best) best = parseScore(raw)
+      pending--
+      if (pending <= 0) finish()
+    }
+    const skip = function () {
+      pending--
+      if (pending <= 0) finish()
+    }
+
     try {
       storage.get({
         key: STORE_KEY,
         success: function (data) {
-          const v = pickValue(data)
-          that.dbg = 'R:' + (v === null ? 'null' : v)
-          that.setBar(that.dbg)
-          that.applySaved(v)
+          take(pickValue(data))
         },
-        fail: function (data, code) {
-          that.dbg = 'R:fail' + code
-          that.setBar(that.dbg)
+        fail: function () {
+          skip()
         }
       })
     } catch (e) {
-      this.setBar('R:throw')
+      skip()
+    }
+
+    try {
+      file.readText({
+        uri: FILE_URI,
+        success: function (data) {
+          take(data && data.text)
+        },
+        fail: function () {
+          skip()
+        }
+      })
+    } catch (e) {
+      skip()
     }
   },
 
-  onDestroy() {
-    if (this.pendingTimer) clearTimeout(this.pendingTimer)
-    if (this.armTimer) clearTimeout(this.armTimer)
-  },
-
-  setBar(s) {
-    this.bar = s
-  },
-
-  // ---------- 持久化 ----------
-  applySaved(v) {
-    if (!v) return
-    const parts = String(v).split('-')
-    if (parts.length !== 2) return
-    const t = parseInt(parts[0], 10)
-    const b = parseInt(parts[1], 10)
-    if (isNaN(t) || isNaN(b)) return
+  applyScore(t, b, defer) {
     const that = this
+    const tt = t < 0 ? 0 : t
+    const bb = b < 0 ? 0 : b
+    bootScore = { t: tt, b: bb }
+    this.lastSaved = tt + '-' + bb
     const apply = function () {
-      that.top = String(t < 0 ? 0 : t)
-      that.bottom = String(b < 0 ? 0 : b)
+      that.top = String(tt)
+      that.bottom = String(bb)
+      that.syncFont()
     }
     apply()
-    // 防止框架初始化数据覆盖异步回调写入
-    setTimeout(apply, 60)
+    // 兜底：防止框架用初始值重绘把异步恢复的结果盖掉（用户已操作过就不再回写）
+    if (defer) {
+      setTimeout(function () {
+        if (!that.touched) apply()
+      }, 150)
+    }
   },
 
+  // ---------- 写入 ----------
   save() {
-    const that = this
+    const v = this.top + '-' + this.bottom
+    if (v === this.lastSaved) return
+    this.lastSaved = v
+    bootScore = { t: this.num(this.top), b: this.num(this.bottom) }
+    this.writeStorage(v)
+    this.writeFile(v)
+  },
+
+  // 退出/切后台时无条件补写一次
+  saveNow() {
+    const v = this.top + '-' + this.bottom
+    this.lastSaved = v
+    bootScore = { t: this.num(this.top), b: this.num(this.bottom) }
+    this.writeStorage(v)
+    this.writeFile(v)
+  },
+
+  writeStorage(v) {
     try {
-      storage.set({
-        key: STORE_KEY,
-        value: this.top + '-' + this.bottom,
-        success: function () {
-          that.setBar(that.dbg + ' W:ok')
-        },
-        fail: function (data, code) {
-          that.setBar(that.dbg + ' W:fail' + code)
-        }
-      })
-    } catch (e) {
-      this.setBar(this.dbg + ' W:throw')
-    }
+      storage.set({ key: STORE_KEY, value: v })
+    } catch (e) {}
+  },
+
+  writeFile(v) {
+    try {
+      file.writeText({ uri: FILE_URI, text: v })
+    } catch (e) {}
   },
 
   // ---------- 基础能力 ----------
@@ -152,21 +243,33 @@ export default {
     return isNaN(n) ? 0 : n
   },
 
+  // 位数越多字越小，避免 3 位数溢出（设计宽 480）
+  syncFont() {
+    const ft = this.num(this.top)
+    const fb = this.num(this.bottom)
+    this.fsTop = ft >= 100 ? 200 : 300
+    this.fsBottom = fb >= 100 ? 200 : 300
+  },
+
   add(side) {
     const cur = this.num(this[side])
-    if (cur >= 199) return
+    if (cur >= 999) return
+    this.touched = true
     this[side] = String(cur + 1)
+    this.syncFont()
     this.buzz('short')
     this.save()
   },
 
   minus(side) {
     const cur = this.num(this[side])
+    this.touched = true
     if (cur <= 0) {
       this.buzz('short')
       return
     }
     this[side] = String(cur - 1)
+    this.syncFont()
     this.buzzDouble()
     this.save()
   },
@@ -213,17 +316,19 @@ export default {
   },
 
   // ---------- 上滑重置（二次确认）----------
+  setBar(s) {
+    this.bar = s
+  },
+
   resetFlow() {
     const that = this
     if (!this.armed) {
       this.armed = true
-      this.tip = '再滑确认'
       this.setBar('再滑确认')
       this.buzz('short')
       this.armTimer = setTimeout(function () {
         that.armed = false
-        that.tip = '重置'
-        that.setBar(that.dbg || '重置')
+        that.setBar('')
         that.armTimer = 0
       }, 2500)
       return
@@ -231,11 +336,13 @@ export default {
     if (this.armTimer) clearTimeout(this.armTimer)
     this.armTimer = 0
     this.armed = false
+    this.touched = true
     this.top = '0'
     this.bottom = '0'
+    this.syncFont()
     this.buzzDouble()
     this.save()
-    this.setBar(that.dbg || '重置')
+    this.setBar('')
   },
 
   // ---------- 手势 ----------
@@ -251,6 +358,7 @@ export default {
     const dx = end.x - start.x
     const dy = end.y - start.y
     if (dx > 90 && Math.abs(dy) < 90) {
+      this.saveNow()
       try {
         router.back()
       } catch (e) {}
