@@ -22,7 +22,7 @@ const RECORD_LOG = 'internal://files/taptally-records.log'
 export const MAX_RECORDS = 5
 
 // 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
-export const APP_VERSION = '1.6.2'
+export const APP_VERSION = '1.6.3'
 
 // 内存缓存
 let scoreCache = null // { t, b }

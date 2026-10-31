@@ -168,9 +168,16 @@ def make_screen(scale=2):
 
 if __name__ == "__main__":
     os.makedirs(MEDIA, exist_ok=True)
-    # 官方模板的图标是 128x128；手环列表对小图更宽容，统一按 128 输出
-    make_logo(128).convert("RGBA").save(os.path.join(MEDIA, "icon.png"))
-    print("wrote media/icon.png 128x128")
+    # 应用商店/社区源的图标：192，靠 12% 留白把视觉直径压到 ~146
+    make_logo(192, pad_ratio=0.120).convert("RGBA").save(os.path.join(MEDIA, "icon.png"))
+    print("wrote media/icon.png 192x192 (pad 12%)")
+
+    # 手环应用列表用的图标：画布 100（原生 App 就是 100，例如水平仪 test_level.rpk），
+    # 只留 3% 透明边。画布尺寸会参与启动器排版——128 的画布会把下方 App 名挤出去，
+    # 视觉直径保持在 ~94（128x0.76≈97 与原生一致）。
+    make_logo(100, pad_ratio=0.030).convert("RGBA").save(
+        os.path.join(HERE, "..", "src", "common", "logo.png"))
+    print("wrote src/common/logo.png 100x100 (pad 3%)")
     for s in (512, 256):
         p = os.path.join(HERE, "logo-%d.png" % s)
         make_logo(s).save(p)
