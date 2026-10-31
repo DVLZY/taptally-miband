@@ -185,3 +185,10 @@
   `<scroll>` 里的内容容器默认 `flex-direction: row`，所有条目被横向排开在屏幕外，
   只剩第一条可见。改为 `.list`/新加的 `.items` 都 `flex-direction: column`、`.item` 补 `width: 100%`。
   数据层一直是好的（诊断读数 N5 已证明），这纯粹是布局问题。
+
+## 1.6.2（versionCode 26）
+
+- 记分页上下黑边：`pill-shaped` 屏改为**贴边**（`pad=0`，原来留 18），卡片/窄缝高度改为**按整数像素分配**
+  （`cardH=floor((dh-gap)/2)`、`cardH2=usable-gap-cardH`），不再靠百分比取整，杜绝残余缝隙；圆屏仍留 70px、rect 留 14px
+- 修圆角不生效：`.rndPill`/`.rndCircle` 原来写在 `.cardTop`/`.cardBot` 之前，同为单类选择器被后面的
+  `border-radius: 52px` 覆盖 —— 移到后面后 **110px 才真正生效**（此前一直是 52px）

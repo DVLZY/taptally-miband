@@ -1,12 +1,12 @@
 <template>
   <div class="root" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="card cardTop {{rCls}}" onclick="onTop" onlongpress="onTopLong">
+    <div class="card cardTop {{rCls}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
       <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
-    <div class="mid" onlongpress="onMidLong">
+    <div class="mid" style="height: {{gapH}}px" onlongpress="onMidLong">
       <text class="midText" style="font-size: {{midFs}}px">{{mid}}</text>
     </div>
-    <div class="card cardBot {{rCls}}" onclick="onBottom" onlongpress="onBottomLong">
+    <div class="card cardBot {{rCls}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
       <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
     </div>
   </div>
@@ -41,13 +41,18 @@ function coord(evt) {
 function metricsOf(w, h, shape) {
   const dw = DESIGN_W
   const dh = dw * h / w
-  let pad = 14
+  // 圆屏必须留边（方角位置是屏幕外），胶囊屏（手环9/10）贴边显示，
+  // 否则上下会露出一圈黑边
+  let pad = 0
   if (shape === 'circle') pad = Math.round(dw * 0.1465)
-  else if (shape === 'pill-shaped') pad = 18
+  else if (shape !== 'pill-shaped') pad = 14
   const gap = Math.round(dh * 0.04)
-  const cardH = (dh - pad * 2 - gap) / 2
+  // 用整数像素分配高度，剩下的零头给下半区，保证两块+窄缝正好等于可用高度
+  const usable = dh - pad * 2
+  const cardH = Math.floor((usable - gap) / 2)
+  const cardH2 = usable - gap - cardH
   const cardW = dw - pad * 2
-  return { dh: dh, pad: pad, cardH: cardH, cardW: cardW }
+  return { dh: dh, pad: pad, gap: gap, cardH: cardH, cardH2: cardH2, cardW: cardW }
 }
 
 export default {
@@ -57,7 +62,10 @@ export default {
     rCls: '',
     fsTop: 425,
     fsBot: 425,
-    pad: 14,
+    pad: 0,
+    gapH: 48,
+    cardH: 574,
+    cardH2: 574,
     midFs: 24,
     mid: '',
     armed: false
@@ -155,6 +163,9 @@ export default {
     this.devShape = shape || 'rect'
     this.metrics = metricsOf(w, h, shape)
     this.pad = this.metrics.pad
+    this.gapH = this.metrics.gap
+    this.cardH = this.metrics.cardH
+    this.cardH2 = this.metrics.cardH2
     this.midFs = Math.max(18, Math.round(this.metrics.dh * 0.0196))
     this.syncFont()
   },
@@ -392,14 +403,6 @@ export default {
   border-radius: 52px;
 }
 
-.rndPill {
-  border-radius: 110px;
-}
-
-.rndCircle {
-  border-radius: 260px;
-}
-
 .cardTop {
   background-color: #7fd9b7;
   border-color: #9ff0d5;
@@ -410,6 +413,15 @@ export default {
   background-color: #92cdf5;
   border-color: #bfe6ff;
   border-radius: 52px;
+}
+
+/* 必须写在 .cardTop/.cardBot 之后：同为单类选择器，后写的才生效 */
+.rndPill {
+  border-radius: 110px;
+}
+
+.rndCircle {
+  border-radius: 260px;
 }
 
 .mid {
