@@ -178,3 +178,10 @@
 - 卡片圆角跟随屏幕形状（pill-shaped → 110px）
 - 图标：圆形渐变（上绿下蓝、无分隔线），`0` 左上、`9` 右下，画布留白 12% 与原生一致
 - 发布物料同步到 1.6.0：`downloads/com.taptally.scoreboard.release.1.6.0.rpk`、`manifest_v2.json`、`media/*`
+
+## 1.6.1（versionCode 25）
+
+- 修「记分列表只显示 1 条、长按删掉后才露出下一条」：
+  `<scroll>` 里的内容容器默认 `flex-direction: row`，所有条目被横向排开在屏幕外，
+  只剩第一条可见。改为 `.list`/新加的 `.items` 都 `flex-direction: column`、`.item` 补 `width: 100%`。
+  数据层一直是好的（诊断读数 N5 已证明），这纯粹是布局问题。
