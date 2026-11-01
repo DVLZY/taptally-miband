@@ -1,8 +1,8 @@
 {
   "package": "com.taptally.scoreboard",
   "name": "点记",
-  "versionName": "1.7.3",
-  "versionCode": 37,
+  "versionName": "1.7.4",
+  "versionCode": 38,
   "minPlatformVersion": 1200,
   "icon": "/common/logo.png",
   "deviceTypeList": [
@@ -46,6 +46,9 @@
       },
       "pages/history": {
         "component": "history"
+      },
+      "pages/probe": {
+        "component": "probe"
       }
     }
   }

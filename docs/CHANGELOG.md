@@ -288,3 +288,10 @@
 - 记分列表序号字号 `itemH×0.40` → **`×0.52`**（真机约 20 → 26 物理像素），序号列宽 `×0.40` → `×0.46`
 - 列表页脚字号 `dh×0.026` → **`dh×0.036`**（真机约 13 → 18 物理像素），`v1.7.3` 不再像脚注
 - 首帧默认值同步，`publish/gen_ui.py` 同步，界面渲染图与真机一致
+
+## 1.7.4（versionCode 38，临时排障版）
+
+- 新增 `pages/probe/probe.ux`「圆角试验页」：同一屏放 5 个同尺寸方块，`border-radius` 依次 40/80/110/170/300，
+  底部显示 `screenWidth x screenHeight screenShape`
+- 入口：**历史页长按页脚**（`onFootLong` → `router.push('/pages/probe')`）
+- 目的：真机拍一张就能确认 Vela 如何解释 `border-radius`（是否随 designWidth 缩放、是否夹到短边一半）

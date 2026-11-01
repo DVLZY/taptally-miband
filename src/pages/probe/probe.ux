@@ -1,0 +1,80 @@
+<template>
+  <div class="root">
+    <div class="row r40"><text class="tag">40</text></div>
+    <div class="row r80"><text class="tag">80</text></div>
+    <div class="row r110"><text class="tag">110</text></div>
+    <div class="row r170"><text class="tag">170</text></div>
+    <div class="row r300"><text class="tag">300</text></div>
+    <text class="info">{{info}}</text>
+  </div>
+</template>
+
+<script>
+import device from '@system.device'
+import brightness from '@system.brightness'
+
+export default {
+  private: {
+    info: '读尺寸中'
+  },
+
+  onInit() {
+    const that = this
+    brightness.setKeepScreenOn({ keepScreenOn: true })
+    device.getInfo({
+      success(ret) {
+        const w = ret.screenWidth || 0
+        const h = ret.screenHeight || 0
+        that.info = w + 'x' + h + ' ' + (ret.screenShape || '?')
+      },
+      fail() {
+        that.info = 'getInfo fail'
+      }
+    })
+  },
+
+  onDestroy() {
+    brightness.setKeepScreenOn({ keepScreenOn: false })
+  }
+}
+</script>
+
+<style>
+/* 圆角试验页：同一个 480 设计宽的画面里放 5 个一样大、只有 border-radius 不同的方块，
+   真机拍一张就能确认 Vela 到底怎么解释 border-radius 这个值 */
+.root {
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  background-color: #0b1216;
+}
+
+.row {
+  width: 100%;
+  height: 190px;
+  margin-bottom: 10px;
+  align-items: center;
+  justify-content: center;
+  background-color: #7fd9b7;
+  border-width: 2px;
+  border-color: #9ff0d5;
+}
+
+.r40 { border-radius: 40px; }
+.r80 { border-radius: 80px; }
+.r110 { border-radius: 110px; }
+.r170 { border-radius: 170px; }
+.r300 { border-radius: 300px; }
+
+.tag {
+  font-size: 44px;
+  color: #0b3d2c;
+}
+
+.info {
+  margin-top: 8px;
+  font-size: 32px;
+  color: #ffd479;
+}
+</style>

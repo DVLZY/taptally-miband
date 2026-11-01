@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.7.3",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.7.3.rpk",
-      "versionCode": 37,
+      "version": "1.7.4",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.7.4.rpk",
+      "versionCode": 38,
       "updatelogs": [
+        {
+          "version": "1.7.4",
+          "content": "临时排障版：新增圆角试验页（历史页长按页脚进入），用来确认真机对 border-radius 的实际解释。"
+        },
         {
           "version": "1.7.3",
           "content": "记分列表序号与页脚字号放大（序号 0.40→0.52 行高、页脚约 13→18 物理像素）。"
