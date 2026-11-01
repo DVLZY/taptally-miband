@@ -327,3 +327,10 @@
   · 记分页 `leaveTo(uri, back)`：先播 `exitA/B`（opacity 1→0、translateX 0→-46px，150ms），150ms 后才 `router.push` / `router.back`
   · 记录页 `leaveBack()` 同理，点记录恢复与右滑返回都走它
   · 进入动效改横向：`translateX 40px → 0`，和离场方向接上，看起来是一屏滑走、下一屏滑入
+
+## 1.8.4（versionCode 43）
+
+- 应用图标在画布中的占比 **86% → 90%**（`make_logo(100, pad_ratio=0.075 → 0.050)`）。
+  依据：拆开原生样例 `test_level.rpk` 的 `common/logo.png` 量了一下，它的不透明区域**铺满 100×100 画布**（art ratio 1.0），
+  我们的有 7% 透明边距，启动器按画布排版，所以看起来比原生小一圈。
+  90% 是折中值：1.6.3 试过 94% 时应用名被压到图标下面，90% 尚未触到那个边界。

@@ -175,7 +175,7 @@ if __name__ == "__main__":
     # 手环应用列表用的图标：画布 100（原生 App 就是 100，例如水平仪 test_level.rpk），
     # 只留 3% 透明边。画布尺寸会参与启动器排版——128 的画布会把下方 App 名挤出去，
     # 视觉直径保持在 ~94（128x0.76≈97 与原生一致）。
-    make_logo(100, pad_ratio=0.075).convert("RGBA").save(
+    make_logo(100, pad_ratio=0.050).convert("RGBA").save(
         os.path.join(HERE, "..", "src", "common", "logo.png"))
     print("wrote src/common/logo.png 100x100 (pad 7.5%)")
     for s in (512, 256):

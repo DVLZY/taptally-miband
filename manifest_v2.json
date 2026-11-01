@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.8.3",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.8.3.rpk",
-      "versionCode": 42,
+      "version": "1.8.4",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.8.4.rpk",
+      "versionCode": 43,
       "updatelogs": [
+        {
+          "version": "1.8.4",
+          "content": "应用图标在画布中的占比 86%→90%，与原生应用图标观感一致；页面切换沿用 1.8.3 的离场衔接。"
+        },
         {
           "version": "1.8.3",
           "content": "去掉记分时的底色闪烁，改成数字淡入；页面切换改为「先离场再切页」，两个页面横向衔接。"
