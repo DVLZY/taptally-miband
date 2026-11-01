@@ -99,8 +99,8 @@ def score_screen(top=0, bottom=0, mid="", radius=None):
     k = s.k
     d = s.d
     mid_fs = max(18, round(DH * 0.0196))
-    # CSS 写的是 300px（Vela 会把圆角夹到短边一半 = min(480,588)/2 = 240）
-    want = 300 if radius is None else radius
+    # 与 index.ux 保持一致：卡片圆角 110px（大于短边一半会被 Vela 夹到 240 变胶囊）
+    want = 110 if radius is None else radius
     r = min(want, (min(card_w, card_h) / 2))
     y = pad * k
     for (val, bg, brd, ink, h) in ((top, CARD_T, CARD_T_B, INK_T, card_h),

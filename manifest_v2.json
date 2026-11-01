@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.7.1",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.7.1.rpk",
-      "versionCode": 35,
+      "version": "1.7.2",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.7.2.rpk",
+      "versionCode": 36,
       "updatelogs": [
+        {
+          "version": "1.7.2",
+          "content": "记分页卡片圆角改为 110px，与屏幕圆角量级一致，数字不再被弧线切到。"
+        },
         {
           "version": "1.0.0",
           "content": "首个版本：上下双色分区；单击 +1 / 双击 −1；上滑两次归零；比分本地保存。"
