@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.9.0",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.9.0.rpk",
-      "versionCode": 44,
+      "version": "1.9.1",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.9.1.rpk",
+      "versionCode": 45,
       "updatelogs": [
+        {
+          "version": "1.9.1",
+          "content": "记分列表每行高 +20%、行间距 ×2；比分变长时字号自动缩小，避免顶出条目。"
+        },
         {
           "version": "1.9.0",
           "content": "记分页与记分列表改为同一页内的左右平移切换（不再切页面）；去掉记分时的所有闪烁动效。"

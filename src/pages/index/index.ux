@@ -22,10 +22,10 @@
           <text class="dbg" style="font-size: {{dbgFs}}px">{{dbg}}</text>
         </div>
         <div class="items">
-          <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
+          <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px; margin-bottom: {{itemGap}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
             <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px">{{$item.no}}</text>
             <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px; margin-right: {{accentMr}}px"></div>
-            <text class="val" style="font-size: {{valFs}}px; width: {{valW}}px">{{$item.score}}</text>
+            <text class="val" style="font-size: {{$item.fs}}px; width: {{valW}}px">{{$item.score}}</text>
           </div>
           <div class="empty" if="{{empty}}">
             <text class="emptyText" style="font-size: {{noFs}}px">还没有记录</text>
@@ -101,7 +101,26 @@ export default {
     cardH2: 574,
     midFs: 24,
     mid: '',
-    armed: false
+    armed: false,
+    // 以下必须在 private 里声明，否则赋值不会触发视图更新（列表会整页空白）
+    pagerCls: '',
+    records: [],
+    empty: true,
+    dbgOn: false,
+    dbg: '',
+    itemH: 153,
+    itemGap: 24,
+    barH: 80,
+    itemFs: 101,
+    noFs: 80,
+    titleFs: 44,
+    dbgFs: 56,
+    footFs: 44,
+    accentW: 11,
+    accentMl: 9,
+    accentMr: 31,
+    noW: 70,
+    valW: 219
   },
 
   onInit() {
@@ -241,7 +260,7 @@ export default {
     const dh = m.dh
     const dw = DESIGN_W
     const pad = m.pad
-    const itemH = Math.max(64, Math.min(150, Math.round(dh * 0.104)))
+    const itemH = Math.max(76, Math.min(186, Math.round(dh * 0.125)))
     const noW = Math.round(itemH * 0.46)
     const accentW = Math.max(6, Math.round(itemH * 0.075))
     const accentMl = Math.round(itemH * 0.06)
@@ -250,8 +269,9 @@ export default {
     if (valW < 90) valW = 90
     return {
       itemH: itemH,
+      itemGap: Math.round(itemH * 0.16),
       barH: Math.round(itemH * 0.52),
-      valFs: Math.round(itemH * 0.66),
+      itemFs: Math.round(itemH * 0.66),
       noFs: Math.max(24, Math.round(itemH * 0.52)),
       titleFs: Math.max(24, Math.round(dh * 0.036)),
       dbgFs: Math.round(dh * 0.046),
@@ -267,8 +287,9 @@ export default {
   applyHistMetrics() {
     const m = this.histMetrics()
     this.itemH = m.itemH
+    this.itemGap = m.itemGap
     this.barH = m.barH
-    this.valFs = m.valFs
+    this.itemFs = m.itemFs
     this.noFs = m.noFs
     this.titleFs = m.titleFs
     this.dbgFs = m.dbgFs
@@ -306,10 +327,16 @@ export default {
         let side = 'accent accentD'
         if (arr[i].t > arr[i].b) side = 'accent accentA'
         else if (arr[i].b > arr[i].t) side = 'accent accentB'
+        const txt = arr[i].t + ':' + arr[i].b
+        // 比分越长字号越小：字宽≈0.62×字号（含冒号），保证不顶出条目
+        let fs = that.itemFs
+        const byW = Math.floor(that.valW / (0.62 * txt.length))
+        if (byW < fs) fs = byW
         rows.push({
           id: 'r' + i + '_' + (arr[i].ts || 0),
           no: String(i + 1),
-          score: arr[i].t + ':' + arr[i].b,
+          score: txt,
+          fs: fs,
           side: side
         })
       }
@@ -851,7 +878,6 @@ export default {
 .item {
   flex-direction: row;
   align-items: center;
-  margin-bottom: 12px;
   border-width: 2px;
   border-color: #1d2f39;
   border-radius: 30px;

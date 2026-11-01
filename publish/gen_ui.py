@@ -122,12 +122,13 @@ def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
 # ---------- 记分列表页 ----------
 def history_metrics():
     pad = round(DW * 0.1465)     # 70，与记分页同一个分支（circle）
-    item_h = max(64, min(150, round(DH * 0.104)))
+    item_h = max(76, min(186, round(DH * 0.125)))
     return {
         "pad": pad,
         "itemH": item_h,
+        "itemGap": round(item_h * 0.16),
         "barH": round(item_h * 0.52),
-        "valFs": round(item_h * 0.66),
+        "itemFs": round(item_h * 0.66),
         "noFs": max(24, round(item_h * 0.52)),
         "titleFs": max(24, round(DH * 0.036)),
         "dbgFs": max(40, round(DH * 0.046)),
@@ -167,7 +168,7 @@ def history_screen(records, dbg="", empty_text="还没有记录"):
                     font(FR, m["noFs"] * k), (79, 107, 120))
     for i, (t, b) in enumerate(records):
         x0, x1 = m["pad"] * k, (DW - m["pad"]) * k
-        rounded(d, [x0, y * k, x1, (y + m["itemH"]) * k], 30 * k, fill=ITEM_BG, outline=ITEM_BRD, width=2 * k)
+        rounded(d, [x0, y * k, x1, (y + m["itemH"]) * k], 40 * k, fill=ITEM_BG, outline=ITEM_BRD, width=2 * k)
         side = ACC_A if t > b else (ACC_B if b > t else ACC_D)
         # flex 顺序：序号(noW) → 色条(margin-left, width, margin-right) → 比分
         ax = x0 + (m["noW"] + m["accentMl"]) * k
@@ -176,9 +177,12 @@ def history_screen(records, dbg="", empty_text="还没有记录"):
         center_text(d, (x0, y * k, x0 + m["noW"] * k, (y + m["itemH"]) * k), str(i + 1),
                     font(FR, m["noFs"] * k), NO_INK)
         vx = ax + (m["accentW"] + m["accentMr"]) * k
-        center_text(d, (vx, y * k, vx + m["valW"] * k, (y + m["itemH"]) * k), "%d:%d" % (t, b),
-                    font(FB, m["valFs"] * k), VAL_INK)
-        y += m["itemH"] + 10
+        txt = "%d:%d" % (t, b)
+        # 与 App 一致：比分越长字号越小，字宽≈0.62×字号
+        val_fs = min(m["itemFs"], int(m["valW"] / (0.62 * len(txt))))
+        center_text(d, (vx, y * k, vx + m["valW"] * k, (y + m["itemH"]) * k), txt,
+                    font(FB, max(20, val_fs) * k), VAL_INK)
+        y += m["itemH"] + m["itemGap"]
     # 页脚
     fy = DH - foot_h
     center_text(d, (0, fy * k, DW * k, DH * k), "单击恢复 · 长按删除", font(FR, m["footFs"] * k), FOOT_INK)
