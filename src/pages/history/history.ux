@@ -1,0 +1,373 @@
+<template>
+  <div class="root" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="head">
+      <text class="title" style="font-size: {{titleFs}}px" onlongpress="onTitleLong">记录</text>
+      <text class="dbg" style="font-size: {{dbgFs}}px">{{dbg}}</text>
+    </div>
+    <scroll class="list" scroll-y="true">
+      <div class="items">
+        <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
+        <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px">{{$item.no}}</text>
+        <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px; margin-right: {{accentMr}}px"></div>
+        <text class="val" style="font-size: {{valFs}}px; width: {{valW}}px">{{$item.score}}</text>
+        </div>
+      </div>
+      <div class="empty" if="{{empty}}">
+        <text class="emptyText" style="font-size: {{noFs}}px">还没有记录</text>
+      </div>
+    </scroll>
+    <div class="foot">
+      <text class="footText" style="font-size: {{footFs}}px" onlongpress="onFootLong">{{foot}}</text>
+    </div>
+  </div>
+</template>
+
+<script>
+import vibrator from '@system.vibrator'
+import router from '@system.router'
+import device from '@system.device'
+import { loadRecords, removeRecord, saveScore, debugStats, MAX_RECORDS, APP_VERSION } from '../../common/store.js'
+
+const DESIGN_W = 480
+
+function coord(evt) {
+  let t = evt
+  if (evt && evt.touches && evt.touches.length) t = evt.touches[0]
+  else if (evt && evt.changedTouches && evt.changedTouches.length) t = evt.changedTouches[0]
+  if (!t) return null
+  let x = t.clientX
+  if (x === undefined || x === null) x = t.pageX
+  if (x === undefined || x === null) x = t.offsetX
+  let y = t.clientY
+  if (y === undefined || y === null) y = t.pageY
+  if (y === undefined || y === null) y = t.offsetY
+  if (x === undefined || x === null || y === undefined || y === null) return null
+  return { x: x, y: y }
+}
+
+// 行内顺序：序号 → 色条 → 比分；字号比 1.3.0 明显放大
+function metricsOf(w, h, shape) {
+  const dw = DESIGN_W
+  const dh = dw * h / w
+  let pad = 14
+  if (shape === 'circle') pad = Math.round(dw * 0.1465)
+  else if (shape === 'pill-shaped') pad = 18
+  // 行高 0.104 → 0.125（+20%）；上限同步 150 → 180，避免大屏被夹住
+  const itemH = Math.max(64, Math.min(180, Math.round(dh * 0.125)))
+  const noW = Math.round(itemH * 0.46)
+  const accentW = Math.max(6, Math.round(itemH * 0.075))
+  const accentMl = Math.round(itemH * 0.06)
+  const accentMr = Math.round(itemH * 0.20)
+  let valW = dw - pad * 2 - noW - accentW - accentMl - accentMr - Math.round(itemH * 0.08)
+  if (valW < 90) valW = 90
+  return {
+    pad: pad,
+    itemH: itemH,
+    barH: Math.round(itemH * 0.52),
+    valFs: Math.round(itemH * 0.66),
+    noFs: Math.max(24, Math.round(itemH * 0.52)),
+    titleFs: Math.max(24, Math.round(dh * 0.036)),
+    dbgFs: Math.max(40, Math.round(dh * 0.046)),
+    footFs: Math.max(30, Math.round(dh * 0.036)),
+    accentW: accentW,
+    accentMl: accentMl,
+    accentMr: accentMr,
+    noW: noW,
+    valW: valW
+  }
+}
+
+export default {
+  private: {
+    records: [],
+    empty: true,
+    pad: 14,
+    itemH: 153,
+    barH: 80,
+    valFs: 101,
+    noFs: 80,
+    titleFs: 44,
+    dbgFs: 56,
+    dbg: '',
+    dbgOn: false,
+    accentW: 9,
+    accentMl: 8,
+    accentMr: 25,
+    noW: 58,
+    valW: 300,
+    footFs: 44,
+    devH: 0,
+    foot: 'v' + APP_VERSION
+  },
+
+  onInit() {
+    this.startPoint = null
+    this.raw = []
+  },
+
+  onReady() {
+    this.syncDevice()
+    this.render()
+  },
+
+  onShow() {
+    this.render()
+  },
+
+  onDestroy() {
+    this.raw = []
+  },
+
+  syncDevice() {
+    const that = this
+    try {
+      device.getInfo({
+        success: function (ret) {
+          if (!ret || !ret.screenWidth || !ret.screenHeight) return
+          that.applyMetrics(ret.screenWidth, ret.screenHeight, ret.screenShape)
+        },
+        fail: function () {}
+      })
+    } catch (e) {}
+  },
+
+  applyMetrics(w, h, shape) {
+    const m = metricsOf(w, h, shape)
+    this.devH = h || 0
+    this.pad = m.pad
+    this.itemH = m.itemH
+    this.barH = m.barH
+    this.valFs = m.valFs
+    this.noFs = m.noFs
+    this.titleFs = m.titleFs
+    this.dbgFs = m.dbgFs
+    this.accentW = m.accentW
+    this.accentMl = m.accentMl
+    this.accentMr = m.accentMr
+    this.noW = m.noW
+    this.valW = m.valW
+    this.footFs = m.footFs
+  },
+
+  // 长按标题：切换标题下方的诊断行（S/F = 两通道读到的字符数，N = 内存条数）
+  // 长按页脚：进圆角试验页（临时排障用，确认 border-radius 在真机上的实际表现）
+  onFootLong() {
+    router.push({ uri: '/pages/probe' })
+  },
+
+  onTitleLong() {
+    const that = this
+    this.buzz('short')
+    this.dbgOn = !this.dbgOn
+    if (!this.dbgOn) {
+      this.dbg = ''
+      return
+    }
+    debugStats(function (st) {
+      that.dbg = 'S' + st.s + ' F' + st.f + ' N' + st.c
+    })
+  },
+
+  // 时间降序：最新的一局在最上面
+  render() {
+    const that = this
+    loadRecords(function (list) {
+      const arr = (list || []).slice(0)
+      arr.sort(function (a, b) {
+        return (b.ts || 0) - (a.ts || 0)
+      })
+      that.raw = arr
+      const rows = []
+      for (let i = 0; i < arr.length && i < MAX_RECORDS; i++) {
+        // 色条表示这局谁赢：上方赢=绿、下方赢=蓝、平局=灰
+        let side = 'accent accentD'
+        if (arr[i].t > arr[i].b) side = 'accent accentA'
+        else if (arr[i].b > arr[i].t) side = 'accent accentB'
+        rows.push({
+          id: 'r' + i + '_' + (arr[i].ts || 0),
+          no: String(i + 1),
+          score: arr[i].t + ':' + arr[i].b,
+          side: side
+        })
+      }
+      that.records = rows
+      that.empty = rows.length === 0
+      // 诊断：S/F = 偏好存储与文件里读到多少字符，N = 内存条数
+      if (that.dbgOn) {
+        debugStats(function (st) {
+          that.dbg = 'S' + st.s + ' F' + st.f + ' N' + st.c
+        })
+      }
+    })
+  },
+
+  buzz(mode) {
+    try {
+      vibrator.vibrate({ mode: mode || 'short' })
+    } catch (e) {}
+  },
+
+  // 单击：把这条比分恢复到记分页
+  // 先写比分（同步生效），再等一帧返回；记分页 onShow 时必定重新读一次
+  onPick(idx) {
+    // 长按删除后系统仍会派发 click，这里直接忽略
+    if (this.longMark) {
+      this.longMark = false
+      return
+    }
+    const it = this.raw[idx]
+    if (!it) return
+    saveScore(it.t, it.b)
+    this.buzz('short')
+    setTimeout(function () {
+      try {
+        router.back()
+      } catch (e) {}
+    }, 60)
+  },
+
+  // 长按：删除这条
+  // 走 store.removeRecord（内部先强制回读磁盘再按时间戳定位删除）：
+  // 用 this.raw 这份渲染快照覆盖写盘，会把别的页面刚存的记录冲掉
+  onDrop(idx) {
+    this.longMark = true
+    const that = this
+    const it = this.raw[idx]
+    if (!it) return
+    this.buzz('short')
+    removeRecord(it.ts, function (list) {
+      that.raw = (list || []).slice(0)
+      that.render()
+    })
+  },
+
+  // ---------- 手势：左 -> 右 返回记分页 ----------
+  onTouchStart(evt) {
+    this.startPoint = coord(evt)
+    this.longMark = false
+  },
+
+  onTouchEnd(evt) {
+    const start = this.startPoint
+    this.startPoint = null
+    const end = coord(evt)
+    if (!start || !end) return
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+
+    // 左 -> 右滑：返回记分页
+    if (Math.abs(dx) <= Math.abs(dy)) return
+    if (dx > 90) {
+      this.buzz('short')
+      try {
+        router.back()
+      } catch (e) {}
+    }
+  }
+}
+</script>
+
+<style>
+.root {
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: #070e12;
+}
+
+.head {
+  height: 12%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.title {
+  color: #d6e8eb;
+  font-weight: bold;
+  text-align: center;
+}
+
+.dbg {
+  color: #7fd9b7;
+  font-weight: bold;
+  text-align: center;
+}
+
+.list {
+  /* 12% + 78% + 10% 必须正好 100%：之前写 80% 合计 102%，
+     页脚会被挤出屏幕（就是「看不到页脚/诊断串」的原因之一） */
+  height: 78%;
+  /* scroll 内的内容容器默认是 row，不写 column 的话所有条目会横向排开，
+     屏幕上只看得到第一条（删掉它才露出下一条）——这就是「只显示 1 条」的根因 */
+  flex-direction: column;
+}
+
+.items {
+  flex-direction: column;
+  width: 100%;
+}
+
+.item {
+  width: 100%;
+  margin-bottom: 10px;
+  flex-direction: row;
+  align-items: center;
+  border-width: 2px;
+  border-color: #1b2932;
+  background-color: #101c23;
+  /* 首帧兜底，理由同首页卡片 */
+  border-radius: 30px;
+}
+
+.accent {
+  border-width: 2px;
+  border-radius: 8px;
+}
+
+.accentA {
+  background-color: #56d9ae;
+  border-color: #56d9ae;
+}
+
+.accentB {
+  background-color: #6cc5f3;
+  border-color: #6cc5f3;
+}
+
+.accentD {
+  background-color: #5b7180;
+  border-color: #5b7180;
+}
+
+.no {
+  text-align: center;
+  color: #6d8d9c;
+}
+
+.val {
+  font-weight: bold;
+  text-align: center;
+  color: #deeef5;
+}
+
+.empty {
+  height: 140px;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyText {
+  color: #4f6b78;
+}
+
+.foot {
+  height: 10%;
+  align-items: center;
+  justify-content: center;
+}
+
+.footText {
+  color: #4f6b78;
+}
+</style>

@@ -1,40 +1,13 @@
 <template>
-  <div class="root {{enterCls}}" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <!-- 两页并排放在同一个容器里，靠 translateX 左右平移切换：
-         比 router 切页更连续（系统转场不可配置，切页必然是硬切） -->
-    <div class="pager {{pagerCls}}">
-      <!-- 第 1 页：记分 -->
-      <div class="page" style="padding: {{pad}}px">
-        <div class="card cardTop {{rCls}} {{pressTop}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
-          <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
-        </div>
-        <div class="mid" style="height: {{gapH}}px" onlongpress="onMidLong">
-          <text class="midText {{midCls}}" style="font-size: {{midFs}}px">{{mid}}</text>
-        </div>
-        <div class="card cardBot {{rCls}} {{pressBot}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
-          <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
-        </div>
-      </div>
-      <!-- 第 2 页：记分列表 -->
-      <div class="page" style="padding-left: {{pad}}px; padding-right: {{pad}}px">
-        <div class="head">
-          <text class="title" style="font-size: {{titleFs}}px" onlongpress="onTitleLong">记录</text>
-          <text class="dbg" style="font-size: {{dbgFs}}px">{{dbg}}</text>
-        </div>
-        <div class="items">
-          <div class="item" for="{{records}}" tid="id" style="height: {{itemH}}px; margin-bottom: {{itemGap}}px" onclick="onPick($idx)" onlongpress="onDrop($idx)">
-            <text class="no" style="font-size: {{noFs}}px; width: {{noW}}px">{{$item.no}}</text>
-            <div class="{{$item.side}}" style="height: {{barH}}px; width: {{accentW}}px; margin-left: {{accentMl}}px; margin-right: {{accentMr}}px"></div>
-            <text class="val" style="font-size: {{$item.fs}}px; width: {{valW}}px">{{$item.score}}</text>
-          </div>
-          <div class="empty" if="{{empty}}">
-            <text class="emptyText" style="font-size: {{noFs}}px">还没有记录</text>
-          </div>
-        </div>
-        <div class="foot">
-          <text class="footText" style="font-size: {{footFs}}px" onlongpress="onFootLong">{{foot}}</text>
-        </div>
-      </div>
+  <div class="root" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="card cardTop {{rCls}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
+      <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
+    </div>
+    <div class="mid" style="height: {{gapH}}px" onlongpress="onMidLong">
+      <text class="midText" style="font-size: {{midFs}}px">{{mid}}</text>
+    </div>
+    <div class="card cardBot {{rCls}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
+      <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
     </div>
   </div>
 </template>
@@ -43,7 +16,7 @@
 import vibrator from '@system.vibrator'
 import router from '@system.router'
 import device from '@system.device'
-import { loadScore, saveScore, addRecord, loadRecords, removeRecord, debugStats, MAX_RECORDS, APP_VERSION } from '../../common/store.js'
+import { loadScore, saveScore, addRecord, loadRecords, APP_VERSION } from '../../common/store.js'
 
 const DESIGN_W = 480
 let bootScore = null
@@ -85,12 +58,6 @@ function metricsOf(w, h, shape) {
 export default {
   private: {
     top: '0',
-    // 动效状态：靠切换类名重放动画（Vela 里改回同名类不会重新触发）
-    enterCls: '',
-    exitCls: '',
-    pressTop: '',
-    pressBot: '',
-    midCls: '',
     bottom: '0',
     rCls: '',
     fsTop: 425,
@@ -101,26 +68,7 @@ export default {
     cardH2: 574,
     midFs: 24,
     mid: '',
-    armed: false,
-    // 以下必须在 private 里声明，否则赋值不会触发视图更新（列表会整页空白）
-    pagerCls: '',
-    records: [],
-    empty: true,
-    dbgOn: false,
-    dbg: '',
-    itemH: 153,
-    itemGap: 24,
-    barH: 80,
-    itemFs: 101,
-    noFs: 80,
-    titleFs: 44,
-    dbgFs: 56,
-    footFs: 44,
-    accentW: 11,
-    accentMl: 9,
-    accentMr: 31,
-    noW: 70,
-    valW: 219
+    armed: false
   },
 
   onInit() {
@@ -146,8 +94,6 @@ export default {
   },
 
   onReady() {
-    this.playEnter()
-    this.applyHistMetrics()
     this.syncDevice()
     this.restore(false)
     // 预热历史记录缓存：加记录时才能合并出完整历史，而不是覆盖成 1 条
@@ -157,7 +103,6 @@ export default {
   // 从列表页返回时**一定**强制回读一次磁盘：列表页可能刚把另一局的比分写进去
   onShow() {
     const that = this
-    this.playEnter()          // 从列表页回来也重新播一次，切换不突兀
     if (this.wasHidden) {
       this.wasHidden = false
       this.touched = false
@@ -201,212 +146,11 @@ export default {
   showMid(text, ms) {
     const that = this
     this.mid = text
-    this.midCls = this.midCls === 'fadeA' ? 'fadeB' : 'fadeA'
-    if (this.midClsTimer) clearTimeout(this.midClsTimer)
-    this.midClsTimer = setTimeout(function () {
-      that.midCls = ''
-      that.midClsTimer = 0
-    }, 200)
     if (this.midTimer) clearTimeout(this.midTimer)
     this.midTimer = setTimeout(function () {
       that.mid = ''
       that.midTimer = 0
     }, ms || 3000)
-  },
-
-  // ---------- 动效 ----------
-  // Vela 里把类名改回同名不会重放动画，所以每次都在 A/B 两个等价类之间切换
-  playEnter() {
-    const that = this
-    // 页面刚 attach 时立刻挂类，第一帧可能还没画出来，动画相当于被吞掉；
-    // 隔一帧再挂，进入动效才真的看得见
-    if (this.enterReadyTimer) clearTimeout(this.enterReadyTimer)
-    this.enterReadyTimer = setTimeout(function () {
-      that.enterCls = that.enterCls === 'enterA' ? 'enterB' : 'enterA'
-      that.enterReadyTimer = 0
-    }, 40)
-    if (this.enterTimer) clearTimeout(this.enterTimer)
-    this.enterTimer = setTimeout(function () {
-      that.enterCls = ''
-      that.enterTimer = 0
-    }, 420)
-  },
-
-  pressAt(y) {
-    const edge = this.pad + this.cardH
-    if (y <= edge) {
-      this.pressTop = 'pressed'
-      this.pressBot = ''
-    } else {
-      this.pressBot = 'pressed'
-      this.pressTop = ''
-    }
-  },
-
-  releasePress() {
-    const that = this
-    // 延迟一点再复位，手指点得快也能看到按下的那一帧
-    if (this.pressTimer) clearTimeout(this.pressTimer)
-    this.pressTimer = setTimeout(function () {
-      that.pressTop = ''
-      that.pressBot = ''
-      that.pressTimer = 0
-    }, 90)
-  },
-
-  // ---------- 第二页：记分列表 ----------
-  histMetrics() {
-    const m = this.metrics || metricsOf(192, 490, 'circle')
-    const dh = m.dh
-    const dw = DESIGN_W
-    const pad = m.pad
-    const itemH = Math.max(76, Math.min(186, Math.round(dh * 0.125)))
-    const noW = Math.round(itemH * 0.46)
-    const accentW = Math.max(6, Math.round(itemH * 0.075))
-    const accentMl = Math.round(itemH * 0.06)
-    const accentMr = Math.round(itemH * 0.20)
-    let valW = dw - pad * 2 - noW - accentW - accentMl - accentMr - Math.round(itemH * 0.08)
-    if (valW < 90) valW = 90
-    return {
-      itemH: itemH,
-      itemGap: Math.round(itemH * 0.16),
-      barH: Math.round(itemH * 0.52),
-      itemFs: Math.round(itemH * 0.66),
-      noFs: Math.max(24, Math.round(itemH * 0.52)),
-      titleFs: Math.max(24, Math.round(dh * 0.036)),
-      dbgFs: Math.round(dh * 0.046),
-      footFs: Math.max(30, Math.round(dh * 0.036)),
-      accentW: accentW,
-      accentMl: accentMl,
-      accentMr: accentMr,
-      noW: noW,
-      valW: valW
-    }
-  },
-
-  applyHistMetrics() {
-    const m = this.histMetrics()
-    this.itemH = m.itemH
-    this.itemGap = m.itemGap
-    this.barH = m.barH
-    this.itemFs = m.itemFs
-    this.noFs = m.noFs
-    this.titleFs = m.titleFs
-    this.dbgFs = m.dbgFs
-    this.footFs = m.footFs
-    this.accentW = m.accentW
-    this.accentMl = m.accentMl
-    this.accentMr = m.accentMr
-    this.noW = m.noW
-    this.valW = m.valW
-  },
-
-  // 横向平移切页：pager 宽 200%，translateX(-50%) 正好挪一屏
-  openHistory() {
-    this.saveNow()
-    this.applyHistMetrics()
-    this.renderRecords()
-    this.pagerCls = 'pagerOn'
-    this.buzz('short')
-  },
-
-  closeHistory() {
-    this.pagerCls = ''
-  },
-
-  renderRecords() {
-    const that = this
-    loadRecords(function (list) {
-      const arr = (list || []).slice(0)
-      arr.sort(function (a, b) {
-        return (b.ts || 0) - (a.ts || 0)
-      })
-      that.raw = arr
-      const rows = []
-      for (let i = 0; i < arr.length && i < MAX_RECORDS; i++) {
-        let side = 'accent accentD'
-        if (arr[i].t > arr[i].b) side = 'accent accentA'
-        else if (arr[i].b > arr[i].t) side = 'accent accentB'
-        const txt = arr[i].t + ':' + arr[i].b
-        // 比分越长字号越小：字宽≈0.62×字号（含冒号），保证不顶出条目
-        let fs = that.itemFs
-        const byW = Math.floor(that.valW / (0.62 * txt.length))
-        if (byW < fs) fs = byW
-        rows.push({
-          id: 'r' + i + '_' + (arr[i].ts || 0),
-          no: String(i + 1),
-          score: txt,
-          fs: fs,
-          side: side
-        })
-      }
-      that.records = rows
-      that.empty = rows.length === 0
-      if (that.dbgOn) {
-        debugStats(function (st) {
-          that.dbg = 'S' + st.s + ' F' + st.f + ' N' + st.c
-        })
-      }
-    })
-  },
-
-  onPick(idx) {
-    if (this.longMark) {
-      this.longMark = false
-      return
-    }
-    const it = this.raw[idx]
-    if (!it) return
-    this.buzz('short')
-    saveScore(it.t, it.b)
-    this.applyScore(it.t, it.b, true)
-    this.pagerCls = ''
-  },
-
-  onDrop(idx) {
-    this.longMark = true
-    const that = this
-    const it = this.raw[idx]
-    if (!it) return
-    this.buzz('short')
-    removeRecord(it.ts, function () {
-      that.renderRecords()
-    })
-  },
-
-  onTitleLong() {
-    const that = this
-    this.buzz('short')
-    this.dbgOn = !this.dbgOn
-    if (!this.dbgOn) {
-      this.dbg = ''
-      return
-    }
-    debugStats(function (st) {
-      that.dbg = 'S' + st.s + ' F' + st.f + ' N' + st.c
-    })
-  },
-
-  onFootLong() {
-    try {
-      router.push({ uri: '/pages/probe' })
-    } catch (e) {}
-  },
-
-  // 离场：先把内容滑走/淡出，再真正切页，避免"啪一下换屏"
-  leaveTo(uri, back) {
-    const that = this
-    if (this.leaving) return
-    this.leaving = true
-    this.exitCls = this.exitCls === 'exitA' ? 'exitB' : 'exitA'
-    setTimeout(function () {
-      that.exitCls = ''
-      that.leaving = false
-      try {
-        if (back) router.back()
-        else router.push({ uri: uri })
-      } catch (e) {}
-    }, 150)
   },
 
   // ---------- 屏幕自适应 ----------
@@ -646,35 +390,30 @@ export default {
     this.startPoint = coord(evt)
     // 新的一次触摸：清掉上一次的长按标记
     this.longMark = false
-    if (this.startPoint) this.pressAt(this.startPoint.y)
   },
 
   onTouchEnd(evt) {
-    this.releasePress()
     const start = this.startPoint
     this.startPoint = null
     const end = coord(evt)
     if (!start || !end) return
     const dx = end.x - start.x
     const dy = end.y - start.y
-    // 横滑：在列表页左->右返回记分页；在记分页 右->左 进列表、左->右 退出应用
+    // 横向：左 -> 右 退出；右 -> 左 进记分列表
     if (Math.abs(dx) > Math.abs(dy)) {
-      if (this.pagerCls === 'pagerOn') {
-        if (dx > 90) {
-          this.buzz('short')
-          this.closeHistory()
-        }
-        return
-      }
-      if (dx < -90) {
-        this.openHistory()
-      } else if (dx > 90) {
+      if (dx > 90) {
         this.saveNow()
-        this.leaveTo(null, true)
+        try {
+          router.back()
+        } catch (e) {}
+      } else if (dx < -90) {
+        this.saveNow()
+        try {
+          router.push({ uri: '/pages/history' })
+        } catch (e) {}
       }
       return
     }
-    if (this.pagerCls === 'pagerOn') return
     // 上滑：重置（两次确认）
     if (dy < -90) {
       this.resetFlow()
@@ -698,25 +437,25 @@ export default {
   justify-content: center;
   border-width: 2px;
   /* 首帧兜底：数据绑定要等第一次渲染后才生效，这里先给最终值，避免"先直角后圆角"的闪一下。
-     170px = 卡片半宽（圆屏分支下卡宽 340），圆角与屏幕两端的胶囊弧度一致 */
-  border-radius: 170px;
+     110px ≈ 屏幕自身的圆角量级（屏宽 192 的圆角约 40px，换算设计宽 480 即 ~100） */
+  border-radius: 110px;
 }
 
 .cardTop {
   background-color: #7fd9b7;
   border-color: #9ff0d5;
-  border-radius: 170px;
+  border-radius: 110px;
 }
 
 .cardBot {
   background-color: #92cdf5;
   border-color: #bfe6ff;
-  border-radius: 170px;
+  border-radius: 110px;
 }
 
 /* 必须写在 .cardTop/.cardBot 之后：同为单类选择器，后写的才生效 */
 .rndPill {
-  border-radius: 170px;
+  border-radius: 110px;
 }
 
 .rndRect {
@@ -724,7 +463,7 @@ export default {
 }
 
 .rndCircle {
-  border-radius: 170px;
+  border-radius: 110px;
 }
 
 .mid {
@@ -742,191 +481,11 @@ export default {
   text-align: center;
 }
 
-/* ---------- 动效 ----------
-   Vela 支持 transform / transition / @keyframes；@keyframes 里能动画的属性只有
-   background-color、background-position、opacity、width/height（不支持百分比）、transform。
-   这里只用 opacity 与 transform，成本最低、不触发重新排版。 */
-/* 按下反馈只用 opacity：动 transform 会让带圆角+边框的卡片在某些机型上
-   重新栅格化，出现一条竖向接缝，所以这里不碰几何属性 */
-.card {
-  transition-property: all;
-  transition-duration: 110ms;
-  transition-timing-function: ease-out;
-}
-
-.pressed {
-  opacity: 0.9;
-}
-
-.enterA {
-  animation-name: enterA;
-  animation-duration: 260ms;
-  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-
-.enterB {
-  animation-name: enterB;
-  animation-duration: 260ms;
-  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-
-@keyframes enterA {
-  0% { opacity: 0; transform: translateX(40px); }
-  100% { opacity: 1; transform: translateX(0px); }
-}
-
-@keyframes enterB {
-  0% { opacity: 0; transform: translateX(40px); }
-  100% { opacity: 1; transform: translateX(0px); }
-}
-
-
-.exitA {
-  animation-name: exitA;
-  animation-duration: 150ms;
-  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
-}
-
-.exitB {
-  animation-name: exitB;
-  animation-duration: 150ms;
-  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
-}
-
-@keyframes exitA {
-  0% { opacity: 1; transform: translateX(0px); }
-  100% { opacity: 0; transform: translateX(-46px); }
-}
-
-@keyframes exitB {
-  0% { opacity: 1; transform: translateX(0px); }
-  100% { opacity: 0; transform: translateX(-46px); }
-}
-
-.fadeA {
-  animation-name: fadeA;
-  animation-duration: 170ms;
-  animation-timing-function: ease-out;
-}
-
-.fadeB {
-  animation-name: fadeB;
-  animation-duration: 170ms;
-  animation-timing-function: ease-out;
-}
-
-@keyframes fadeA {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0px); }
-}
-
-@keyframes fadeB {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0px); }
-}
-
 .scoreTop {
   color: #06402c;
 }
 
 .scoreBot {
   color: #063a55;
-}
-
-.pager {
-  width: 200%;
-  height: 100%;
-  flex-direction: row;
-  transition-property: all;
-  transition-duration: 260ms;
-  transition-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-
-.pagerOn {
-  transform: translateX(-50%);
-}
-
-.page {
-  width: 50%;
-  height: 100%;
-  flex-direction: column;
-}
-
-/* ---------- 记分列表页（原来在 pages/history） ---------- */
-.head {
-  height: 12%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.title {
-  color: #e8f3f4;
-  font-weight: bold;
-}
-
-.dbg {
-  color: #6ee3b4;
-  font-weight: bold;
-}
-
-.items {
-  height: 78%;
-  flex-direction: column;
-}
-
-.item {
-  flex-direction: row;
-  align-items: center;
-  border-width: 2px;
-  border-color: #1d2f39;
-  border-radius: 30px;
-  background-color: #16232b;
-}
-
-.no {
-  color: #7d97a8;
-  text-align: center;
-}
-
-.accent {
-  border-radius: 6px;
-}
-
-.accentA {
-  background-color: #56d9ae;
-}
-
-.accentB {
-  background-color: #6cc5f3;
-}
-
-.accentD {
-  background-color: #46606d;
-}
-
-.val {
-  color: #eaf4f6;
-  font-weight: bold;
-  text-align: center;
-}
-
-.empty {
-  align-items: center;
-  justify-content: center;
-}
-
-.emptyText {
-  color: #4e6672;
-}
-
-.foot {
-  height: 10%;
-  align-items: center;
-  justify-content: center;
-}
-
-.footText {
-  color: #3d5561;
 }
 </style>

@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.9.1",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.9.1.rpk",
-      "versionCode": 45,
+      "version": "1.7.5",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.7.5.rpk",
+      "versionCode": 39,
       "updatelogs": [
+        {
+          "version": "1.7.5",
+          "content": "回退到单页结构：撤销合并页左右平移与全部动效，恢复独立记分页/列表页；列表行高 +20%。"
+        },
         {
           "version": "1.9.1",
           "content": "记分列表每行高 +20%、行间距 ×2；比分变长时字号自动缩小，避免顶出条目。"
