@@ -132,6 +132,9 @@ def _size_for(n, card_h, card_w, r):
 
 
 def make_cover(W=1200, H=800):
+    """封面：左侧文案 + 右侧两台带仿真机身的手环（记分页 / 记录页）。"""
+    from gen_radius_style import score_screen_raw, frame as band_frame
+
     img = Image.new("RGBA", (W, H), BG)
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
@@ -145,7 +148,8 @@ def make_cover(W=1200, H=800):
 
     f_title = ImageFont.truetype(FONT_B, 104)
     f_sub = ImageFont.truetype(FONT_B, 32)
-    f_body = ImageFont.truetype(FONT_R, 31)
+    f_body = ImageFont.truetype(FONT_R, 30)
+    f_cap = ImageFont.truetype(FONT_R, 27)
 
     d.text((290, 86), "点记", font=f_title, fill=(255, 255, 255, 255))
     d.text((298, 232), "TapTally · 对局计分", font=f_sub, fill=GREEN)
@@ -153,7 +157,7 @@ def make_cover(W=1200, H=800):
     lines = [
         "单击 +1 / 长按 −1，短震反馈",
         "上绿下蓝双色分区，比分一眼看清",
-        "右→左划看记分列表，单击恢复 / 长按删除",
+        "右→左划看记录，单击恢复 / 长按删除",
         "上滑两次归零存档，左→右划退出",
     ]
     y = 320
@@ -164,18 +168,19 @@ def make_cover(W=1200, H=800):
 
     d.text((88, H - 88), "Xiaomi Smart Band 9 / Vela 快应用", font=f_body, fill=(120, 160, 160, 255))
 
-    # 手环整机（屏幕 + 机身），用独立的渲染脚本画好再贴上来
-    try:
-        from gen_radius_style import score_screen_raw, frame as band_frame
-        mock = band_frame(score_screen_raw("12", "9", 0, 240))
-        mh = 560
-        mock = mock.resize((int(mock.width * mh / mock.height), mh), Image.LANCZOS)
-    except Exception:
-        mock = band_mock(208, int(208 * 490 / 192))
-        mh = mock.height
-    mx = W - mock.width - 132
-    img.alpha_composite(mock, (mx, 96))
-    d.text((mx + 10, 96 + mh + 30), "单击加分 · 长按减分", font=f_body, fill=(150, 200, 195, 255))
+    # ---- 右侧两台手环（带仿真机身边框）----
+    shots = [
+        ("记分页", band_frame(score_screen_raw("12", "9", 0, 240)), 560, 660),
+        ("记录页", band_frame(make_list_screen([(12, 9), (7, 11), (11, 5), (3, 3), (21, 18)], 3)),
+         512, 928),
+    ]
+    for cap, dev, th, x in shots:
+        dev = dev.resize((int(dev.width * th / dev.height), th), Image.LANCZOS)
+        yy = 96 + (560 - th) // 2
+        img.alpha_composite(dev, (x, yy))
+        bb = d.textbbox((0, 0), cap, font=f_cap)
+        d.text((x + (dev.width - (bb[2] - bb[0])) / 2 - bb[0], yy + th + 22), cap,
+               font=f_cap, fill=(150, 200, 195, 255))
     return img
 
 
@@ -241,7 +246,7 @@ def make_list_screen(rows, scale=2):
     # 页脚
     f_f = ImageFont.truetype(FONT_R, foot_fs)
     bb = d.textbbox((0, 0), "单击恢复 · 长按删除", font=f_f)
-    d.text(((W - (bb[2] - bb[0])) / 2 - bb[0], H - int(H * 0.075)), "单击恢复 · 长按删除", font=f_f, fill=(79, 107, 120, 255))
+    d.text(((W - (bb[2] - bb[0])) / 2 - bb[0], H - int(H * 0.115)), "单击恢复 · 长按删除", font=f_f, fill=(79, 107, 120, 255))
     return img
 
 
