@@ -1,5 +1,5 @@
 <template>
-  <div class="root {{enterCls}}" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+  <div class="root {{enterCls}} {{exitCls}}" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="head">
       <text class="title" style="font-size: {{titleFs}}px" onlongpress="onTitleLong">记录</text>
       <text class="dbg" style="font-size: {{dbgFs}}px">{{dbg}}</text>
@@ -89,6 +89,7 @@ export default {
     dbgFs: 56,
     dbg: '',
     enterCls: '',
+    exitCls: '',
     dbgOn: false,
     accentW: 9,
     accentMl: 8,
@@ -171,6 +172,21 @@ export default {
   },
 
   // 时间降序：最新的一局在最上面
+  // 返回记分页前先播离场，避免"啪一下换屏"
+  leaveBack() {
+    const that = this
+    if (this.leaving) return
+    this.leaving = true
+    this.exitCls = this.exitCls === 'exitA' ? 'exitB' : 'exitA'
+    setTimeout(function () {
+      that.exitCls = ''
+      that.leaving = false
+      try {
+        router.back()
+      } catch (e) {}
+    }, 150)
+  },
+
   // Vela 里类名改回同名不会重放动画，所以在两个等价类之间来回切
   playEnter() {
     const that = this
@@ -232,11 +248,7 @@ export default {
     if (!it) return
     saveScore(it.t, it.b)
     this.buzz('short')
-    setTimeout(function () {
-      try {
-        router.back()
-      } catch (e) {}
-    }, 60)
+    this.leaveBack()
   },
 
   // 长按：删除这条
@@ -272,9 +284,7 @@ export default {
     if (Math.abs(dx) <= Math.abs(dy)) return
     if (dx > 90) {
       this.buzz('short')
-      try {
-        router.back()
-      } catch (e) {}
+      this.leaveBack()
     }
   }
 }
@@ -400,13 +410,35 @@ export default {
 }
 
 @keyframes enterA {
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0px); }
+  0% { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0px); }
 }
 
 @keyframes enterB {
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0px); }
+  0% { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0px); }
+}
+
+.exitA {
+  animation-name: exitA;
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+.exitB {
+  animation-name: exitB;
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes exitA {
+  0% { opacity: 1; transform: translateX(0px); }
+  100% { opacity: 0; transform: translateX(-46px); }
+}
+
+@keyframes exitB {
+  0% { opacity: 1; transform: translateX(0px); }
+  100% { opacity: 0; transform: translateX(-46px); }
 }
 
 .item {

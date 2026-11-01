@@ -1,13 +1,13 @@
 <template>
-  <div class="root {{enterCls}}" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+  <div class="root {{enterCls}} {{exitCls}}" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="card cardTop {{rCls}} {{pressTop}} {{bumpTop}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
-      <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
+      <text class="score scoreTop {{bumpTop}}" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
     <div class="mid" style="height: {{gapH}}px" onlongpress="onMidLong">
       <text class="midText {{midCls}}" style="font-size: {{midFs}}px">{{mid}}</text>
     </div>
     <div class="card cardBot {{rCls}} {{pressBot}} {{bumpBot}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
-      <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
+      <text class="score scoreBot {{bumpBot}}" style="font-size: {{fsBot}}px">{{bottom}}</text>
     </div>
   </div>
 </template>
@@ -60,6 +60,7 @@ export default {
     top: '0',
     // 动效状态：靠切换类名重放动画（Vela 里改回同名类不会重新触发）
     enterCls: '',
+    exitCls: '',
     pressTop: '',
     pressBot: '',
     bumpTop: '',
@@ -212,6 +213,22 @@ export default {
       that.pressBot = ''
       that.pressTimer = 0
     }, 90)
+  },
+
+  // 离场：先把内容滑走/淡出，再真正切页，避免"啪一下换屏"
+  leaveTo(uri, back) {
+    const that = this
+    if (this.leaving) return
+    this.leaving = true
+    this.exitCls = this.exitCls === 'exitA' ? 'exitB' : 'exitA'
+    setTimeout(function () {
+      that.exitCls = ''
+      that.leaving = false
+      try {
+        if (back) router.back()
+        else router.push({ uri: uri })
+      } catch (e) {}
+    }, 150)
   },
 
   // ---------- 屏幕自适应 ----------
@@ -468,14 +485,10 @@ export default {
     if (Math.abs(dx) > Math.abs(dy)) {
       if (dx > 90) {
         this.saveNow()
-        try {
-          router.back()
-        } catch (e) {}
+        this.leaveTo(null, true)
       } else if (dx < -90) {
         this.saveNow()
-        try {
-          router.push({ uri: '/pages/history' })
-        } catch (e) {}
+        this.leaveTo('/pages/history', false)
       }
       return
     }
@@ -575,18 +588,18 @@ export default {
 }
 
 @keyframes enterA {
-  0% { opacity: 0; transform: translateY(48px); }
-  100% { opacity: 1; transform: translateY(0px); }
+  0% { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0px); }
 }
 
 @keyframes enterB {
-  0% { opacity: 0; transform: translateY(48px); }
-  100% { opacity: 1; transform: translateY(0px); }
+  0% { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0px); }
 }
 
 /* 记分变化：卡片底色闪一下（background-color 是可动画属性，且不涉及几何） */
 .bumpTopA, .bumpTopB {
-  animation-duration: 190ms;
+  animation-duration: 150ms;
   animation-timing-function: ease-out;
 }
 
@@ -594,19 +607,17 @@ export default {
 .bumpTopB { animation-name: bumpTopB; }
 
 @keyframes bumpTopA {
-  0% { background-color: #7fd9b7; }
-  40% { background-color: #a6eccf; }
-  100% { background-color: #7fd9b7; }
+  0% { opacity: 0.35; }
+  100% { opacity: 1; }
 }
 
 @keyframes bumpTopB {
-  0% { background-color: #7fd9b7; }
-  40% { background-color: #a6eccf; }
-  100% { background-color: #7fd9b7; }
+  0% { opacity: 0.35; }
+  100% { opacity: 1; }
 }
 
 .bumpBotA, .bumpBotB {
-  animation-duration: 190ms;
+  animation-duration: 150ms;
   animation-timing-function: ease-out;
 }
 
@@ -614,15 +625,35 @@ export default {
 .bumpBotB { animation-name: bumpBotB; }
 
 @keyframes bumpBotA {
-  0% { background-color: #92cdf5; }
-  40% { background-color: #b9e2ff; }
-  100% { background-color: #92cdf5; }
+  0% { opacity: 0.35; }
+  100% { opacity: 1; }
 }
 
 @keyframes bumpBotB {
-  0% { background-color: #92cdf5; }
-  40% { background-color: #b9e2ff; }
-  100% { background-color: #92cdf5; }
+  0% { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+.exitA {
+  animation-name: exitA;
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+.exitB {
+  animation-name: exitB;
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes exitA {
+  0% { opacity: 1; transform: translateX(0px); }
+  100% { opacity: 0; transform: translateX(-46px); }
+}
+
+@keyframes exitB {
+  0% { opacity: 1; transform: translateX(0px); }
+  100% { opacity: 0; transform: translateX(-46px); }
 }
 
 .fadeA {

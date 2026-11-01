@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.8.2",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.8.2.rpk",
-      "versionCode": 41,
+      "version": "1.8.3",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.8.3.rpk",
+      "versionCode": 42,
       "updatelogs": [
+        {
+          "version": "1.8.3",
+          "content": "去掉记分时的底色闪烁，改成数字淡入；页面切换改为「先离场再切页」，两个页面横向衔接。"
+        },
         {
           "version": "1.8.2",
           "content": "记分页卡片圆角 110→170px，与屏幕两端的胶囊弧度保持同心（170 = 屏幕圆角 240 − 边距 70）。"
