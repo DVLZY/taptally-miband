@@ -77,8 +77,11 @@ class Screen:
 
 
 # ---------- 记分页 ----------
-def score_metrics():
-    pad = 0                      # pill-shaped -> pad 0
+def score_metrics(pad_override=None):
+    # 真机实测（1.7.2 照片）：卡片左右各留约 12%~15% 屏宽的空白，
+    # 说明 device.getInfo().screenShape 在这台手环上返回的是 circle，
+    # 于是 metricsOf 走了圆屏分支：pad = round(dw * 0.1465)。
+    pad = round(DW * 0.1465) if pad_override is None else pad_override
     gap = round(DH * 0.04)       # 49
     usable = DH - pad * 2
     card_h = int((usable - gap) // 2)
@@ -86,15 +89,16 @@ def score_metrics():
     return pad, gap, card_h, card_h2, DW - pad * 2
 
 
-def size_for(n, card_h):
+def size_for(n, card_h, card_w):
+    """与 index.ux 的 sizeFor 完全一致：按卡宽、卡高、430 三者取小。"""
     digits = len(str(n))
-    by_w = DW / (0.60 * digits) * 0.96
+    by_w = card_w / (0.60 * digits) * 0.96
     by_h = card_h * 0.74
     return max(24, round(min(by_w, by_h, 430)))
 
 
-def score_screen(top=0, bottom=0, mid="", radius=None):
-    pad, gap, card_h, card_h2, card_w = score_metrics()
+def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
+    pad, gap, card_h, card_h2, card_w = score_metrics(pad)
     s = Screen()
     k = s.k
     d = s.d
@@ -106,7 +110,7 @@ def score_screen(top=0, bottom=0, mid="", radius=None):
     for (val, bg, brd, ink, h) in ((top, CARD_T, CARD_T_B, INK_T, card_h),
                                    (bottom, CARD_B, CARD_B_B, INK_B, card_h2)):
         rounded(d, [pad * k, y, (pad + card_w) * k, y + h * k], r * k, fill=bg, outline=brd, width=2 * k)
-        fs = size_for(val, h)
+        fs = size_for(val, h, card_w)
         center_text(d, (pad * k, y, (pad + card_w) * k, y + h * k), str(val), font(FB, fs * k), ink)
         y += h * k + gap * k
     if mid:
@@ -117,7 +121,7 @@ def score_screen(top=0, bottom=0, mid="", radius=None):
 
 # ---------- 记分列表页 ----------
 def history_metrics():
-    pad = 18
+    pad = round(DW * 0.1465)     # 70，与记分页同一个分支（circle）
     item_h = max(64, min(150, round(DH * 0.104)))
     return {
         "pad": pad,
@@ -185,8 +189,8 @@ def history_screen(records, dbg="", empty_text="还没有记录"):
 def frame(screen_img, body=0.92):
     """给屏幕套上手环 9 的机身：深色机身、细边框、右侧按键、内外阴影。"""
     sw, sh = screen_img.size
-    bez_x = int(sw * 0.052)
-    bez_y = int(sh * 0.030)
+    bez_x = int(sw * 0.032)
+    bez_y = int(sh * 0.024)
     bw, bh = sw + bez_x * 2, sh + bez_y * 2
     pad = int(sw * 0.16)                     # 画布留白，放投影
     canvas = Image.new("RGBA", (bw + pad * 2, bh + pad * 2), (0, 0, 0, 0))
@@ -283,6 +287,28 @@ def build():
     print("  sheet", sheet.size)
 
 
+def variants_pad():
+    """留白对比：真机现在走圆屏分支（pad 70），这里给出 0 / 24 / 70 三档。"""
+    os.makedirs(OUT, exist_ok=True)
+    shots = [(0, "pad 0（铺满）"), (24, "pad 24（≈10 物理像素）"), (70, "pad 70（真机现状）")]
+    imgs = [(t, frame(score_screen(2, 0, pad=p))) for p, t in shots]
+    cw = max(i.width for _, i in imgs)
+    ch = max(i.height for _, i in imgs) + 64
+    gapx, margin, top = 48, 48, 96
+    W = margin * 2 + len(imgs) * cw + (len(imgs) - 1) * gapx
+    H = top + ch + margin
+    sheet = Image.new("RGB", (W, H), (9, 14, 18))
+    d = ImageDraw.Draw(sheet)
+    d.text((margin, 34), "记分页留白对比 · 2:0（手环 9，192×490）", font=font(FB, 34), fill=(226, 240, 243))
+    for i, (title, f) in enumerate(imgs):
+        x = margin + i * (cw + gapx) + (cw - f.width) // 2
+        sheet.paste(f, (x, top + (ch - 64 - f.height) // 2), f)
+        center_text(d, (margin + i * (cw + gapx), top + ch - 56, margin + (i + 1) * (cw + gapx), top + ch), title,
+                    font(FR, 26), (150, 178, 190))
+    sheet.save(os.path.join(OUT, "pad-variants.png"))
+    print("wrote pad-variants.png", sheet.size)
+
+
 def variants():
     """圆角对比：卡片圆角越大，数字越容易被弧线切到。"""
     os.makedirs(OUT, exist_ok=True)
@@ -308,3 +334,4 @@ def variants():
 if __name__ == "__main__":
     build()
     variants()
+    variants_pad()
