@@ -1,17 +1,13 @@
 <template>
   <div class="root {{enterCls}}" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="card cardTop {{rCls}} {{pressTop}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
-      <div class="valBox {{bumpTop}}">
-        <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
-      </div>
+    <div class="card cardTop {{rCls}} {{pressTop}} {{bumpTop}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
+      <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
     <div class="mid" style="height: {{gapH}}px" onlongpress="onMidLong">
       <text class="midText {{midCls}}" style="font-size: {{midFs}}px">{{mid}}</text>
     </div>
-    <div class="card cardBot {{rCls}} {{pressBot}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
-      <div class="valBox {{bumpBot}}">
-        <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
-      </div>
+    <div class="card cardBot {{rCls}} {{pressBot}} {{bumpBot}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
+      <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
     </div>
   </div>
 </template>
@@ -176,17 +172,24 @@ export default {
   // Vela 里把类名改回同名不会重放动画，所以每次都在 A/B 两个等价类之间切换
   playEnter() {
     const that = this
-    this.enterCls = this.enterCls === 'enterA' ? 'enterB' : 'enterA'
+    // 页面刚 attach 时立刻挂类，第一帧可能还没画出来，动画相当于被吞掉；
+    // 隔一帧再挂，进入动效才真的看得见
+    if (this.enterReadyTimer) clearTimeout(this.enterReadyTimer)
+    this.enterReadyTimer = setTimeout(function () {
+      that.enterCls = that.enterCls === 'enterA' ? 'enterB' : 'enterA'
+      that.enterReadyTimer = 0
+    }, 40)
     if (this.enterTimer) clearTimeout(this.enterTimer)
     this.enterTimer = setTimeout(function () {
       that.enterCls = ''
       that.enterTimer = 0
-    }, 260)
+    }, 420)
   },
 
   bump(side) {
-    if (side === 'top') this.bumpTop = this.bumpTop === 'bumpA' ? 'bumpB' : 'bumpA'
-    else this.bumpBot = this.bumpBot === 'bumpA' ? 'bumpB' : 'bumpA'
+    // 上下两张卡底色不同，所以各自一套关键帧；A/B 交替只为让动画能重放
+    if (side === 'top') this.bumpTop = this.bumpTop === 'bumpTopA' ? 'bumpTopB' : 'bumpTopA'
+    else this.bumpBot = this.bumpBot === 'bumpBotA' ? 'bumpBotB' : 'bumpBotA'
   },
 
   pressAt(y) {
@@ -538,12 +541,6 @@ export default {
   color: #5fc9a6;
 }
 
-.valBox {
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-}
-
 .score {
   font-weight: bold;
   text-align: center;
@@ -553,60 +550,79 @@ export default {
    Vela 支持 transform / transition / @keyframes；@keyframes 里能动画的属性只有
    background-color、background-position、opacity、width/height（不支持百分比）、transform。
    这里只用 opacity 与 transform，成本最低、不触发重新排版。 */
+/* 按下反馈只用 opacity：动 transform 会让带圆角+边框的卡片在某些机型上
+   重新栅格化，出现一条竖向接缝，所以这里不碰几何属性 */
 .card {
-  transition-property: transform;
+  transition-property: all;
   transition-duration: 110ms;
   transition-timing-function: ease-out;
 }
 
 .pressed {
-  transform: scale(0.986);
+  opacity: 0.9;
 }
 
 .enterA {
   animation-name: enterA;
-  animation-duration: 200ms;
-  animation-timing-function: ease-out;
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
 .enterB {
   animation-name: enterB;
-  animation-duration: 200ms;
-  animation-timing-function: ease-out;
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
 @keyframes enterA {
-  0% { opacity: 0; transform: translateY(22px); }
+  0% { opacity: 0; transform: translateY(48px); }
   100% { opacity: 1; transform: translateY(0px); }
 }
 
 @keyframes enterB {
-  0% { opacity: 0; transform: translateY(22px); }
+  0% { opacity: 0; transform: translateY(48px); }
   100% { opacity: 1; transform: translateY(0px); }
 }
 
-.bumpA {
-  animation-name: bumpA;
+/* 记分变化：卡片底色闪一下（background-color 是可动画属性，且不涉及几何） */
+.bumpTopA, .bumpTopB {
   animation-duration: 190ms;
   animation-timing-function: ease-out;
 }
 
-.bumpB {
-  animation-name: bumpB;
+.bumpTopA { animation-name: bumpTopA; }
+.bumpTopB { animation-name: bumpTopB; }
+
+@keyframes bumpTopA {
+  0% { background-color: #7fd9b7; }
+  40% { background-color: #a6eccf; }
+  100% { background-color: #7fd9b7; }
+}
+
+@keyframes bumpTopB {
+  0% { background-color: #7fd9b7; }
+  40% { background-color: #a6eccf; }
+  100% { background-color: #7fd9b7; }
+}
+
+.bumpBotA, .bumpBotB {
   animation-duration: 190ms;
   animation-timing-function: ease-out;
 }
 
-@keyframes bumpA {
-  0% { transform: scale(1); }
-  42% { transform: scale(1.075); }
-  100% { transform: scale(1); }
+.bumpBotA { animation-name: bumpBotA; }
+.bumpBotB { animation-name: bumpBotB; }
+
+@keyframes bumpBotA {
+  0% { background-color: #92cdf5; }
+  40% { background-color: #b9e2ff; }
+  100% { background-color: #92cdf5; }
 }
 
-@keyframes bumpB {
-  0% { transform: scale(1); }
-  42% { transform: scale(1.075); }
-  100% { transform: scale(1); }
+@keyframes bumpBotB {
+  0% { background-color: #92cdf5; }
+  40% { background-color: #b9e2ff; }
+  100% { background-color: #92cdf5; }
 }
 
 .fadeA {

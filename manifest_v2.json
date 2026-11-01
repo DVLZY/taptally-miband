@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.8.0",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.8.0.rpk",
-      "versionCode": 39,
+      "version": "1.8.1",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.8.1.rpk",
+      "versionCode": 40,
       "updatelogs": [
+        {
+          "version": "1.8.1",
+          "content": "动效改用不涉及几何的属性（底色/透明度），修掉点击时出现的竖线；页面进入动效延迟一帧再播，加长到 260ms。"
+        },
         {
           "version": "1.8.0",
           "content": "加入动效：页面进入淡入上移、比分变化弹一下、按下缩放反馈、上滑确认提示淡入。"
