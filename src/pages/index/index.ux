@@ -1,13 +1,17 @@
 <template>
-  <div class="root" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="card cardTop {{rCls}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
-      <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
+  <div class="root {{enterCls}}" style="padding: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="card cardTop {{rCls}} {{pressTop}}" style="height: {{cardH}}px" onclick="onTop" onlongpress="onTopLong">
+      <div class="valBox {{bumpTop}}">
+        <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
+      </div>
     </div>
     <div class="mid" style="height: {{gapH}}px" onlongpress="onMidLong">
-      <text class="midText" style="font-size: {{midFs}}px">{{mid}}</text>
+      <text class="midText {{midCls}}" style="font-size: {{midFs}}px">{{mid}}</text>
     </div>
-    <div class="card cardBot {{rCls}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
-      <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
+    <div class="card cardBot {{rCls}} {{pressBot}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
+      <div class="valBox {{bumpBot}}">
+        <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
+      </div>
     </div>
   </div>
 </template>
@@ -58,6 +62,13 @@ function metricsOf(w, h, shape) {
 export default {
   private: {
     top: '0',
+    // 动效状态：靠切换类名重放动画（Vela 里改回同名类不会重新触发）
+    enterCls: '',
+    pressTop: '',
+    pressBot: '',
+    bumpTop: '',
+    bumpBot: '',
+    midCls: '',
     bottom: '0',
     rCls: '',
     fsTop: 425,
@@ -94,6 +105,7 @@ export default {
   },
 
   onReady() {
+    this.playEnter()
     this.syncDevice()
     this.restore(false)
     // 预热历史记录缓存：加记录时才能合并出完整历史，而不是覆盖成 1 条
@@ -103,6 +115,7 @@ export default {
   // 从列表页返回时**一定**强制回读一次磁盘：列表页可能刚把另一局的比分写进去
   onShow() {
     const that = this
+    this.playEnter()          // 从列表页回来也重新播一次，切换不突兀
     if (this.wasHidden) {
       this.wasHidden = false
       this.touched = false
@@ -146,11 +159,56 @@ export default {
   showMid(text, ms) {
     const that = this
     this.mid = text
+    this.midCls = this.midCls === 'fadeA' ? 'fadeB' : 'fadeA'
+    if (this.midClsTimer) clearTimeout(this.midClsTimer)
+    this.midClsTimer = setTimeout(function () {
+      that.midCls = ''
+      that.midClsTimer = 0
+    }, 200)
     if (this.midTimer) clearTimeout(this.midTimer)
     this.midTimer = setTimeout(function () {
       that.mid = ''
       that.midTimer = 0
     }, ms || 3000)
+  },
+
+  // ---------- 动效 ----------
+  // Vela 里把类名改回同名不会重放动画，所以每次都在 A/B 两个等价类之间切换
+  playEnter() {
+    const that = this
+    this.enterCls = this.enterCls === 'enterA' ? 'enterB' : 'enterA'
+    if (this.enterTimer) clearTimeout(this.enterTimer)
+    this.enterTimer = setTimeout(function () {
+      that.enterCls = ''
+      that.enterTimer = 0
+    }, 260)
+  },
+
+  bump(side) {
+    if (side === 'top') this.bumpTop = this.bumpTop === 'bumpA' ? 'bumpB' : 'bumpA'
+    else this.bumpBot = this.bumpBot === 'bumpA' ? 'bumpB' : 'bumpA'
+  },
+
+  pressAt(y) {
+    const edge = this.pad + this.cardH
+    if (y <= edge) {
+      this.pressTop = 'pressed'
+      this.pressBot = ''
+    } else {
+      this.pressBot = 'pressed'
+      this.pressTop = ''
+    }
+  },
+
+  releasePress() {
+    const that = this
+    // 延迟一点再复位，手指点得快也能看到按下的那一帧
+    if (this.pressTimer) clearTimeout(this.pressTimer)
+    this.pressTimer = setTimeout(function () {
+      that.pressTop = ''
+      that.pressBot = ''
+      that.pressTimer = 0
+    }, 90)
   },
 
   // ---------- 屏幕自适应 ----------
@@ -300,6 +358,7 @@ export default {
     this[side] = String(cur + 1)
     this.syncFont()
     this.buzz('short')
+    this.bump(side)
     this.save()
   },
 
@@ -313,6 +372,7 @@ export default {
     this[side] = String(cur - 1)
     this.syncFont()
     this.buzzDouble()
+    this.bump(side)
     this.save()
   },
 
@@ -390,9 +450,11 @@ export default {
     this.startPoint = coord(evt)
     // 新的一次触摸：清掉上一次的长按标记
     this.longMark = false
+    if (this.startPoint) this.pressAt(this.startPoint.y)
   },
 
   onTouchEnd(evt) {
+    this.releasePress()
     const start = this.startPoint
     this.startPoint = null
     const end = coord(evt)
@@ -476,9 +538,97 @@ export default {
   color: #5fc9a6;
 }
 
+.valBox {
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
 .score {
   font-weight: bold;
   text-align: center;
+}
+
+/* ---------- 动效 ----------
+   Vela 支持 transform / transition / @keyframes；@keyframes 里能动画的属性只有
+   background-color、background-position、opacity、width/height（不支持百分比）、transform。
+   这里只用 opacity 与 transform，成本最低、不触发重新排版。 */
+.card {
+  transition-property: transform;
+  transition-duration: 110ms;
+  transition-timing-function: ease-out;
+}
+
+.pressed {
+  transform: scale(0.986);
+}
+
+.enterA {
+  animation-name: enterA;
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+}
+
+.enterB {
+  animation-name: enterB;
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+}
+
+@keyframes enterA {
+  0% { opacity: 0; transform: translateY(22px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+
+@keyframes enterB {
+  0% { opacity: 0; transform: translateY(22px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+
+.bumpA {
+  animation-name: bumpA;
+  animation-duration: 190ms;
+  animation-timing-function: ease-out;
+}
+
+.bumpB {
+  animation-name: bumpB;
+  animation-duration: 190ms;
+  animation-timing-function: ease-out;
+}
+
+@keyframes bumpA {
+  0% { transform: scale(1); }
+  42% { transform: scale(1.075); }
+  100% { transform: scale(1); }
+}
+
+@keyframes bumpB {
+  0% { transform: scale(1); }
+  42% { transform: scale(1.075); }
+  100% { transform: scale(1); }
+}
+
+.fadeA {
+  animation-name: fadeA;
+  animation-duration: 170ms;
+  animation-timing-function: ease-out;
+}
+
+.fadeB {
+  animation-name: fadeB;
+  animation-duration: 170ms;
+  animation-timing-function: ease-out;
+}
+
+@keyframes fadeA {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+
+@keyframes fadeB {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0px); }
 }
 
 .scoreTop {

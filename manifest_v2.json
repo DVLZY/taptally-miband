@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.7.4",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.7.4.rpk",
-      "versionCode": 38,
+      "version": "1.8.0",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.8.0.rpk",
+      "versionCode": 39,
       "updatelogs": [
+        {
+          "version": "1.8.0",
+          "content": "加入动效：页面进入淡入上移、比分变化弹一下、按下缩放反馈、上滑确认提示淡入。"
+        },
         {
           "version": "1.7.4",
           "content": "临时排障版：新增圆角试验页（历史页长按页脚进入），用来确认真机对 border-radius 的实际解释。"

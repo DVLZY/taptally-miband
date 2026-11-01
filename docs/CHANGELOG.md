@@ -295,3 +295,12 @@
   底部显示 `screenWidth x screenHeight screenShape`
 - 入口：**历史页长按页脚**（`onFootLong` → `router.push('/pages/probe')`）
 - 目的：真机拍一张就能确认 Vela 如何解释 `border-radius`（是否随 designWidth 缩放、是否夹到短边一半）
+
+## 1.8.0（versionCode 39）
+
+- 加入动效（Vela 支持 `transform` / `transition` / `@keyframes`，只用 `opacity` 与 `transform`，不触发重新排版）：
+  · 页面进入：记分页与记录页淡入 + 上移 22/20px，200ms ease-out（`onReady` 与 `onShow` 各播一次，从列表返回也有过渡）
+  · 记分变化：比分数字弹一下（scale 1 → 1.075 → 1，190ms），加分/减分都触发
+  · 按下反馈：触点落在哪个半区，哪张卡片轻微缩到 0.986（110ms 过渡），松手 90ms 后复位
+  · 上滑确认提示：「再滑确认」「已存 N 条」淡入上移 8px，170ms
+- Vela 里把类名改回同名不会重放动画，所以每个动画都准备 A/B 两个等价类名交替切换

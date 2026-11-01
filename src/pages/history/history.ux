@@ -1,5 +1,5 @@
 <template>
-  <div class="root" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+  <div class="root {{enterCls}}" style="padding-left: {{pad}}px; padding-right: {{pad}}px" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="head">
       <text class="title" style="font-size: {{titleFs}}px" onlongpress="onTitleLong">记录</text>
       <text class="dbg" style="font-size: {{dbgFs}}px">{{dbg}}</text>
@@ -88,6 +88,7 @@ export default {
     titleFs: 44,
     dbgFs: 56,
     dbg: '',
+    enterCls: '',
     dbgOn: false,
     accentW: 9,
     accentMl: 8,
@@ -105,11 +106,13 @@ export default {
   },
 
   onReady() {
+    this.playEnter()
     this.syncDevice()
     this.render()
   },
 
   onShow() {
+    this.playEnter()
     this.render()
   },
 
@@ -168,6 +171,17 @@ export default {
   },
 
   // 时间降序：最新的一局在最上面
+  // Vela 里类名改回同名不会重放动画，所以在两个等价类之间来回切
+  playEnter() {
+    const that = this
+    this.enterCls = this.enterCls === 'enterA' ? 'enterB' : 'enterA'
+    if (this.enterTimer) clearTimeout(this.enterTimer)
+    this.enterTimer = setTimeout(function () {
+      that.enterCls = ''
+      that.enterTimer = 0
+    }, 260)
+  },
+
   render() {
     const that = this
     loadRecords(function (list) {
@@ -368,5 +382,36 @@ export default {
 
 .footText {
   color: #4f6b78;
+}
+
+/* ---------- 动效 ----------
+   只用 opacity 与 transform：@keyframes 里可动画的属性只有
+   background-color、background-position、opacity、width/height（不支持百分比）和 transform。 */
+.enterA {
+  animation-name: enterA;
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+}
+
+.enterB {
+  animation-name: enterB;
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+}
+
+@keyframes enterA {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+
+@keyframes enterB {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0px); }
+}
+
+.item {
+  transition-property: transform;
+  transition-duration: 110ms;
+  transition-timing-function: ease-out;
 }
 </style>
