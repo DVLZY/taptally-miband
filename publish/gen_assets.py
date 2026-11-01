@@ -85,24 +85,50 @@ def make_logo(size, ss=4, digit_fs=0.576, stag=0.120, overlap=0.200, pad_ratio=0
 
 
 def band_mock(W, H):
-    """手环屏幕示意：上下双色 + 比分。"""
-    img = rounded(W, int(W * 0.13), (0, 0, 0, 255))
+    """手环屏幕示意：贴边两片卡片 + 圆角=半宽（与 App 的 240px 圆角一致）。"""
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    pad = int(W * 0.06)
-    gap = max(2, int(H * 0.03))
-    r = int(W * 0.07)
-    top = [pad, pad, W - pad, H // 2 - gap // 2]
-    bot = [pad, H // 2 + gap // 2, W - pad, H - pad]
+    gap = max(2, int(H * 0.040))       # App: round(dh*0.04)
+    card_h = (H - gap) // 2            # App: (dh - gap) / 2，pad=0
+    r = W // 2                         # App: border-radius 240 ≈ 屏宽 480 的一半
+    top = [0, 0, W, card_h]
+    bot = [0, card_h + gap, W, H]
     d.rounded_rectangle(top, radius=r, fill=GREEN)
     d.rounded_rectangle(bot, radius=r, fill=BLUE)
-    font = ImageFont.truetype(FONT_B, int(W * 0.30))
-    for txt, box, color in (("12", top, GREEN_TXT), ("9", bot, BLUE_TXT)):
+    for txt, box, color, n in (("12", top, GREEN_TXT, 2), ("9", bot, BLUE_TXT, 1)):
+        # 与 index.ux 的 sizeFor 同构：受卡宽/卡高/圆角内缩三者约束
+        fs = _size_for(n, card_h, W, W / 2.0)
+        font = ImageFont.truetype(FONT_B, int(fs * W / 480.0))
         bb = d.textbbox((0, 0), txt, font=font)
         w, h = bb[2] - bb[0], bb[3] - bb[1]
         cx = (box[0] + box[2]) / 2 - w / 2 - bb[0]
         cy = (box[1] + box[3]) / 2 - h / 2 - bb[1]
         d.text((cx, cy), txt, font=font, fill=color)
-    return img
+    # 屏幕是胶囊形：整体按胶囊裁一刀，卡片两端才会跟着收成屏幕的弧度
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, W - 1, H - 1], radius=W // 2, fill=255)
+    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    out.paste(img, (0, 0), mask)
+    return out
+
+
+def _size_for(n, card_h, card_w, r):
+    """复刻 src/pages/index/index.ux 的 sizeFor（含圆角内缩迭代）。"""
+    import math
+    d = len(str(n))
+    by_h = card_h * 0.74
+    f = min(card_w / (0.60 * d) * 0.96, by_h, 430 * card_w / 480.0)
+    for _ in range(3):
+        half_h = f * 0.36
+        straight = card_h / 2 - r
+        inset = 0.0
+        if half_h > straight:
+            kk = half_h - max(0.0, straight)
+            q = r * r - kk * kk
+            inset = r - (math.sqrt(q) if q > 0 else 0.0)
+        avail = card_w - inset * 2
+        f = min(f, avail / (0.60 * d) * 0.96, by_h)
+    return max(24.0, f)
 
 
 def make_cover(W=1200, H=800):
@@ -138,31 +164,84 @@ def make_cover(W=1200, H=800):
 
     d.text((88, H - 88), "Xiaomi Smart Band 9 / Vela 快应用", font=f_body, fill=(120, 160, 160, 255))
 
-    mock = band_mock(370, 370)
-    img.alpha_composite(mock, (W - 370 - 100, 210))
-    d.text((W - 370 - 100, 600), "单击加分 · 长按减分", font=f_body, fill=(150, 200, 195, 255))
+    # 手环整机（屏幕 + 机身），用独立的渲染脚本画好再贴上来
+    try:
+        from gen_radius_style import score_screen_raw, frame as band_frame
+        mock = band_frame(score_screen_raw("12", "9", 0, 240))
+        mh = 560
+        mock = mock.resize((int(mock.width * mh / mock.height), mh), Image.LANCZOS)
+    except Exception:
+        mock = band_mock(208, int(208 * 490 / 192))
+        mh = mock.height
+    mx = W - mock.width - 132
+    img.alpha_composite(mock, (mx, 96))
+    d.text((mx + 10, 96 + mh + 30), "单击加分 · 长按减分", font=f_body, fill=(150, 200, 195, 255))
     return img
 
 
-def make_screen(scale=2):
-    """手环真实界面 192x490 的 scale 倍图：上下两半 48% + 中间 4% 分隔条。"""
+def make_screen(top="12", bottom="9", scale=2):
+    """手环真实界面 192x490 的 scale 倍图（记分页）：贴边卡片 + 圆角 240。"""
     W, H = 192 * scale, 490 * scale
     img = Image.new("RGBA", (W, H), (0, 0, 0, 255))
     d = ImageDraw.Draw(img)
-    half = int(H * 0.48)
-    bar = H - half * 2
-    d.rectangle([0, 0, W, half], fill=GREEN)
-    d.rectangle([0, half, W, half + bar], fill=(16, 26, 30, 255))
-    d.rectangle([0, half + bar, W, H], fill=BLUE)
-
-    fs = int(120 * scale * 0.92)  # 设计 300px → 物理 120px
-    font = ImageFont.truetype(FONT_B, fs)
-    for txt, box, color in (("12", (0, 0, W, half), GREEN_TXT), ("9", (0, half + bar, W, H), BLUE_TXT)):
-        bb = d.textbbox((0, 0), txt, font=font)
+    gap = int(round(H * 0.040))
+    card_h = (H - gap) // 2
+    r = W // 2
+    for val, box in ((top, [0, 0, W, card_h]), (bottom, [0, card_h + gap, W, H])):
+        d.rounded_rectangle(box, radius=r, fill=GREEN if box[0] == 0 and box[1] == 0 else BLUE)
+        fs = _size_for(len(str(val)), card_h, W, W / 2.0)
+        font = ImageFont.truetype(FONT_B, int(fs * W / 480.0))
+        bb = d.textbbox((0, 0), val, font=font)
         w, h = bb[2] - bb[0], bb[3] - bb[1]
         cx = (box[0] + box[2]) / 2 - w / 2 - bb[0]
         cy = (box[1] + box[3]) / 2 - h / 2 - bb[1]
-        d.text((cx, cy), txt, font=font, fill=color)
+        d.text((cx, cy), val, font=font, fill=GREEN_TXT if box[1] == 0 else BLUE_TXT)
+    return img
+
+
+def make_list_screen(rows, scale=2):
+    """列表页（192x490）：标题 + 5 条记录 + 页脚，参数取自 history.ux。"""
+    W, H = 192 * scale, 490 * scale
+    dh = 1225.0
+    k = H / dh                                  # 设计 → 出图
+    img = Image.new("RGBA", (W, H), (7, 14, 18, 255))
+    d = ImageDraw.Draw(img)
+    pad = int(round(14 * k))
+    head_h = int(H * 0.12)
+    item_h = max(64, min(180, round(dh * 0.125))) * k
+    no_fs = int(max(24, round(dh * 0.125 * 0.52)) * k)
+    val_fs = int(round(dh * 0.125 * 0.66) * k)
+    title_fs = int(max(24, round(dh * 0.036)) * k)
+    foot_fs = int(max(30, round(dh * 0.036)) * k)
+    # 标题
+    f_t = ImageFont.truetype(FONT_B, title_fs)
+    bb = d.textbbox((0, 0), "记录", font=f_t)
+    d.text(((W - (bb[2] - bb[0])) / 2 - bb[0], head_h * 0.35), "记录", font=f_t, fill=(214, 232, 235, 255))
+    # 条目
+    y = head_h
+    f_no = ImageFont.truetype(FONT_R, no_fs)
+    f_val = ImageFont.truetype(FONT_B, val_fs)
+    for i, (a, b) in enumerate(rows[:5]):
+        row = [pad, int(y), W - pad, int(y + item_h)]
+        d.rounded_rectangle(row, radius=int(30 * k), fill=(16, 28, 35, 255), outline=(27, 41, 50, 255), width=max(1, int(2 * k)))
+        side = (86, 217, 174, 255) if a > b else ((108, 197, 243, 255) if b > a else (91, 113, 128, 255))
+        bar_h = int(item_h * 0.52)
+        d.rectangle([pad + int(item_h * 0.46) + int(item_h * 0.06),
+                     int(y + (item_h - bar_h) / 2),
+                     pad + int(item_h * 0.46) + int(item_h * 0.06) + max(3, int(item_h * 0.075)),
+                     int(y + (item_h + bar_h) / 2)], fill=side)
+        bb = d.textbbox((0, 0), str(i + 1), font=f_no)
+        d.text((pad + (item_h * 0.46 - (bb[2] - bb[0])) / 2 - bb[0],
+                y + (item_h - (bb[3] - bb[1])) / 2 - bb[1]), str(i + 1), font=f_no, fill=(109, 141, 156, 255))
+        txt = "%d:%d" % (a, b)
+        bb = d.textbbox((0, 0), txt, font=f_val)
+        d.text(((W - (bb[2] - bb[0])) / 2 - bb[0] + int(item_h * 0.17),
+                y + (item_h - (bb[3] - bb[1])) / 2 - bb[1]), txt, font=f_val, fill=(222, 238, 245, 255))
+        y += item_h + int(item_h * 0.16)
+    # 页脚
+    f_f = ImageFont.truetype(FONT_R, foot_fs)
+    bb = d.textbbox((0, 0), "单击恢复 · 长按删除", font=f_f)
+    d.text(((W - (bb[2] - bb[0])) / 2 - bb[0], H - int(H * 0.075)), "单击恢复 · 长按删除", font=f_f, fill=(79, 107, 120, 255))
     return img
 
 
@@ -186,6 +265,9 @@ if __name__ == "__main__":
     cover.convert("RGB").save(os.path.join(MEDIA, "cover.png"))
     cover.convert("RGB").save(os.path.join(MEDIA, "preview-1.png"))
     print("wrote media/cover.png + preview-1.png", cover.size)
-    screen = make_screen(2)
+    screen = make_screen("12", "9", 2)
     screen.convert("RGB").save(os.path.join(MEDIA, "preview-2.png"))
     print("wrote media/preview-2.png", screen.size)
+    lst = make_list_screen([(12, 9), (7, 11), (11, 5), (3, 3), (21, 18)], 2)
+    lst.convert("RGB").save(os.path.join(MEDIA, "preview-3.png"))
+    print("wrote media/preview-3.png", lst.size)

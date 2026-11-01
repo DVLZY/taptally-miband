@@ -43,9 +43,10 @@ function metricsOf(w, h, shape) {
   const dh = dw * h / w
   // 圆屏必须留边（方角位置是屏幕外），胶囊屏（手环9/10）贴边显示，
   // 否则上下会露出一圈黑边
-  let pad = 0
-  if (shape === 'circle') pad = Math.round(dw * 0.1465)
-  else if (shape !== 'pill-shaped') pad = 14
+  // 卡片贴边（pad=0）：让卡片弧线与屏幕边缘弧线同心，
+  // 手环9 的屏幕是胶囊形（屏宽 192 → 圆角半径 96 物理 = 240 设计像素），
+  // 所以四角直接用 240px，两端弧线就跟屏幕边缘完全重合。
+  const pad = 0
   const gap = Math.round(dh * 0.04)
   // 用整数像素分配高度，剩下的零头给下半区，保证两块+窄缝正好等于可用高度
   const usable = dh - pad * 2
@@ -169,7 +170,6 @@ export default {
 
   applyMetrics(w, h, shape) {
     // 圆角跟屏幕自身的圆角对齐：pill-shaped 屏（手环9）四角很圆，
-    // 52px 显得方、1000px（胶囊）又太圆，取屏幕圆角量级 ≈ 屏宽×0.23
     this.rCls = shape === 'pill-shaped' ? 'rndPill' : (shape === 'circle' ? 'rndCircle' : 'rndRect')
     this.devW = w
     this.devH = h
@@ -278,13 +278,29 @@ export default {
     return isNaN(n) ? 0 : n
   },
 
-  // 字号同时受卡片宽、卡片高约束：位数越多越小，屏幕越矮越小
+  // 字号同时受卡片宽、卡片高、圆角内缩三方面约束：位数越多越小，屏幕越矮越小。
+  // 圆角 240px 时卡片两端是半圆，数字的上下两端会被弧线"吃掉"一部分宽度，
+  // 所以按数字实际半高算出该高度处的可用宽度，迭代收敛（3 次足够）。
   sizeFor(n) {
     const d = String(n).length
     const m = this.metrics || metricsOf(192, 490, 'rect')
-    const byWidth = m.cardW / (0.60 * d) * 0.96
+    const r = 240
     const byHeight = m.cardH * 0.74
-    const f = Math.min(byWidth, byHeight, 430)
+    let f = Math.min(m.cardW / (0.60 * d) * 0.96, byHeight, 430)
+    for (let i = 0; i < 3; i++) {
+      const halfH = f * 0.36                       // 数字半高（字高约 0.72em）
+      const straight = m.cardH / 2 - r             // 侧边还有多长是直的
+      let inset = 0
+      if (halfH > straight) {
+        const k = halfH - Math.max(0, straight)
+        const q = r * r - k * k
+        inset = r - (q > 0 ? Math.sqrt(q) : 0)
+      }
+      const availW = m.cardW - inset * 2
+      const byWidth = availW / (0.60 * d) * 0.96
+      const nf = Math.min(byWidth, byHeight, 430)
+      f = nf < f ? nf : f
+    }
     return Math.round(f < 24 ? 24 : f)
   },
 
@@ -437,33 +453,34 @@ export default {
   justify-content: center;
   border-width: 2px;
   /* 首帧兜底：数据绑定要等第一次渲染后才生效，这里先给最终值，避免"先直角后圆角"的闪一下。
-     110px ≈ 屏幕自身的圆角量级（屏宽 192 的圆角约 40px，换算设计宽 480 即 ~100） */
-  border-radius: 110px;
+     240px = 屏宽 480 的一半：手环9 的屏幕是胶囊形（物理 192 宽、圆角半径 96），
+     卡片贴边 + 同半径 ⇒ 卡片两端弧线与屏幕边缘同心、完全重合 */
+  border-radius: 240px;
 }
 
 .cardTop {
   background-color: #7fd9b7;
   border-color: #9ff0d5;
-  border-radius: 110px;
+  border-radius: 240px;
 }
 
 .cardBot {
   background-color: #92cdf5;
   border-color: #bfe6ff;
-  border-radius: 110px;
+  border-radius: 240px;
 }
 
 /* 必须写在 .cardTop/.cardBot 之后：同为单类选择器，后写的才生效 */
 .rndPill {
-  border-radius: 110px;
+  border-radius: 240px;
 }
 
 .rndRect {
-  border-radius: 52px;
+  border-radius: 240px;
 }
 
 .rndCircle {
-  border-radius: 110px;
+  border-radius: 240px;
 }
 
 .mid {

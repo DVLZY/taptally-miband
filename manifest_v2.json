@@ -21,10 +21,18 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.7.5",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.7.5.rpk",
-      "versionCode": 39,
+      "version": "1.7.7",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.7.7.rpk",
+      "versionCode": 41,
       "updatelogs": [
+        {
+          "version": "1.7.7",
+          "content": "圆角加大后修正数字被弧线切到：字号按圆角内缩自动收敛（两位 384→360）。"
+        },
+        {
+          "version": "1.7.6",
+          "content": "上下半区卡片改为贴边 + 240px 圆角，弧线与屏幕边缘同心、完全重合。"
+        },
         {
           "version": "1.7.5",
           "content": "回退到单页结构：撤销合并页左右平移与全部动效，恢复独立记分页/列表页；列表行高 +20%。"
