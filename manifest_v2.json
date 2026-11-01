@@ -21,9 +21,9 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.7.0",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.7.0.rpk",
-      "versionCode": 34,
+      "version": "1.7.1",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.7.1.rpk",
+      "versionCode": 35,
       "updatelogs": [
         {
           "version": "1.0.0",
@@ -56,6 +56,10 @@
         {
           "version": "1.7.0",
           "content": "正式发布签名（不再使用调试证书）；作者信息绑定 AstroBox 账号；重做封面与预览图。"
+        },
+        {
+          "version": "1.7.1",
+          "content": "修复上滑确认与提示计时器冲突、首帧布局跳动、列表删除定位；发布包改为 jsc 字节码；列表色条按胜负着色。"
         }
       ]
     }
