@@ -5,7 +5,7 @@
 
 ![封面](media/cover.png)
 
-当前版本 **1.7.0** · 包名 `com.taptally.scoreboard` · [下载安装包](https://github.com/DVLZY/taptally-miband/releases/latest)
+当前版本 **1.7.1** · 包名 `com.taptally.scoreboard` · [下载安装包](https://github.com/DVLZY/taptally-miband/releases/latest)
 
 ---
 
@@ -61,7 +61,7 @@
 ### 记分列表
 
 - **右→左划进入**，保留**最近 5 局**，最新的在最上面
-- 每条显示 **序号 · 色条 · 比分**
+- 每条显示 **序号 · 色条 · 比分**，色条表示这局谁赢（绿=上方、蓝=下方、灰=平局）
 - **单击恢复**：比分写回记分页并自动返回
 - **长按删除**：立即删除，删掉的不再出现
 - **0:0 不入库**：只有真正打过的局才进列表
@@ -79,6 +79,26 @@
 - 单边比分上限 **999**
 - 纯本地应用：不联网、无账号、无排行榜，数据只在本机
 - NFC 版与普通版功能一致，**未使用 NFC**
+
+---
+
+## 构建
+
+日常调试：
+
+```bash
+node node_modules/aiot-toolkit/lib/bin.js build --enable-jsc
+```
+
+出正式包（社区源要求非调试签名，见 `scripts/gen_sign.sh`）：
+
+```bash
+node node_modules/aiot-toolkit/lib/bin.js release --enable-jsc --drop-console true
+```
+
+> **必须带 `--enable-jsc`**：`release` 默认不带字节码，打出来的包里是明文
+> `app.js` / `pages/index/index.js`，手环上跑的是另一套加载路径；本项目所有
+> 真机验证过的版本都是 jsc 字节码。`--drop-console` 顺手把 console 调用去掉。
 
 ---
 

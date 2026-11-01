@@ -173,11 +173,15 @@ export default {
       that.raw = arr
       const rows = []
       for (let i = 0; i < arr.length && i < MAX_RECORDS; i++) {
+        // 色条表示这局谁赢：上方赢=绿、下方赢=蓝、平局=灰
+        let side = 'accent accentD'
+        if (arr[i].t > arr[i].b) side = 'accent accentA'
+        else if (arr[i].b > arr[i].t) side = 'accent accentB'
         rows.push({
           id: 'r' + i + '_' + (arr[i].ts || 0),
           no: String(i + 1),
           score: arr[i].t + ':' + arr[i].b,
-          side: i % 2 === 0 ? 'accent accentA' : 'accent accentB'
+          side: side
         })
       }
       that.records = rows
@@ -217,14 +221,15 @@ export default {
   },
 
   // 长按：删除这条
-  // 走 store.removeRecord（内部先强制回读磁盘再删）：
-  // 直接用 this.raw 这份渲染快照覆盖写盘，会把别的页面刚存的记录冲掉
+  // 走 store.removeRecord（内部先强制回读磁盘再按时间戳定位删除）：
+  // 用 this.raw 这份渲染快照覆盖写盘，会把别的页面刚存的记录冲掉
   onDrop(idx) {
     this.longMark = true
     const that = this
-    if (!this.raw[idx]) return
+    const it = this.raw[idx]
+    if (!it) return
     this.buzz('short')
-    removeRecord(idx, function (list) {
+    removeRecord(it.ts, function (list) {
       that.raw = (list || []).slice(0)
       that.render()
     })
@@ -322,6 +327,11 @@ export default {
 .accentB {
   background-color: #6cc5f3;
   border-color: #6cc5f3;
+}
+
+.accentD {
+  background-color: #5b7180;
+  border-color: #5b7180;
 }
 
 .no {

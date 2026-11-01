@@ -72,12 +72,20 @@ export default {
   },
 
   onInit() {
-    this.armTimer = 0
+    this.armTimer = 0 // 上滑「再滑确认」的计时器
+    this.midTimer = 0 // 中间提示文字的计时器（两者必须分开，见 showMid 注释）
     this.startPoint = null
     this.restored = false
     this.touched = false
-    // 手环 9 的默认值，拿到真实设备信息后再覆盖
-    this.metrics = metricsOf(192, 490, 'rect')
+    // 手环 9（192x490 胶囊屏）的默认值，拿到真实设备信息后再覆盖。
+    // 这里必须把 metrics 同步到视图字段：否则首帧用的是 CSS 里的百分比兜底，
+    // 等 device.getInfo 回来才跳一次（表现为「闪一下」）。
+    this.metrics = metricsOf(192, 490, 'pill-shaped')
+    this.pad = this.metrics.pad
+    this.gapH = this.metrics.gap
+    this.cardH = this.metrics.cardH
+    this.cardH2 = this.metrics.cardH2
+    this.rCls = 'rndPill'
     this.midFs = Math.max(18, Math.round(this.metrics.dh * 0.0196))
     if (bootScore) {
       this.restored = true
@@ -114,6 +122,7 @@ export default {
   onDestroy() {
     this.saveNow()
     if (this.armTimer) clearTimeout(this.armTimer)
+    if (this.midTimer) clearTimeout(this.midTimer)
   },
 
   // 中间横条长按：显示「屏幕参数 + 版本号 + 已存记录条数」
@@ -130,13 +139,17 @@ export default {
     }, true)
   },
 
+  // 中间窄缝显示一行字（诊断串 / 「再滑确认」/「已存 N 条」）
+  // 注意：这里只能清自己的 midTimer。1.7.0 及以前用的是 armTimer，
+  // 结果长按中缝看诊断时会把「再滑确认」的计时器清掉、armed 却还是 true，
+  // 下一次上滑就被当成第二次确认直接归零。
   showMid(text, ms) {
     const that = this
     this.mid = text
-    if (this.armTimer) clearTimeout(this.armTimer)
-    this.armTimer = setTimeout(function () {
+    if (this.midTimer) clearTimeout(this.midTimer)
+    this.midTimer = setTimeout(function () {
       that.mid = ''
-      that.armTimer = 0
+      that.midTimer = 0
     }, ms || 3000)
   },
 
@@ -338,11 +351,12 @@ export default {
     const that = this
     if (!this.armed) {
       this.armed = true
-      this.mid = '再滑确认'
+      this.showMid('再滑确认', 2500)
       this.buzz('short')
       this.armTimer = setTimeout(function () {
         that.armed = false
-        that.mid = ''
+        // 只在还停在确认提示上时才清空，避免把后出现的提示（诊断串）提前抹掉
+        if (that.mid === '再滑确认') that.mid = ''
         that.armTimer = 0
       }, 2500)
       return
@@ -362,7 +376,9 @@ export default {
     // （之前另起一次 loadRecords(force) 会和 addRecord 的内部回读抢时序，条数可能显示成旧的）
     if (t > 0 || b > 0) {
       addRecord(t, b, function (list) {
-        that.showMid('已存 ' + (list ? list.length : 0) + ' 条', 1500)
+        const n = list ? list.length : 0
+        // 把刚存下的比分一起回显，比只报条数更能确认「存的是这一局」
+        that.showMid(t + ':' + b + ' 已存 ' + n + '条', 1800)
       })
     } else {
       this.mid = ''

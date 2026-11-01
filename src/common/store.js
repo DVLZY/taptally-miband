@@ -23,7 +23,7 @@ const VER_SEP = '|'
 export const MAX_RECORDS = 5
 
 // 版本号（页面里显示，用来确认手环上跑的到底是哪一版）
-export const APP_VERSION = '1.7.0'
+export const APP_VERSION = '1.7.1'
 
 // 内存缓存
 let scoreCache = null // { t, b }
@@ -288,10 +288,19 @@ export function addRecord(t, b, cb) {
   }, true)
 }
 
-// 删除第 idx 条：直接在缓存上删，然后整份重写
-export function removeRecord(idx, cb) {
+// 删除一条：参数是**该条记录的时间戳**而不是下标。
+// 用下标会在「列表页停留期间、记分页又存了一局」时删错条目；
+// 时间戳来自当前渲染的那份数据，配合强制回读能定位到真正那一条。
+export function removeRecord(ts, cb) {
   const run = function (list) {
-    if (idx < 0 || idx >= list.length) {
+    let idx = -1
+    for (let i = 0; i < list.length; i++) {
+      if ((list[i].ts || 0) === (ts || 0)) {
+        idx = i
+        break
+      }
+    }
+    if (idx < 0) {
       if (cb) cb(clone(list))
       return
     }
@@ -320,15 +329,4 @@ export function debugStats(cb) {
 
 export function pad2(n) {
   return n < 10 ? '0' + n : String(n)
-}
-
-// 时间戳 -> "21:05"；拿不到时间返回空串（列表当前不显示时间，保留给诊断用）
-export function formatTime(ts) {
-  if (!ts) return ''
-  try {
-    const d = new Date(ts)
-    return pad2(d.getHours()) + ':' + pad2(d.getMinutes())
-  } catch (e) {
-    return ''
-  }
 }
