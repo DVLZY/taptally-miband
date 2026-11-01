@@ -21,9 +21,9 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.6.9",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.6.9.rpk",
-      "versionCode": 33,
+      "version": "1.7.0",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.7.0.rpk",
+      "versionCode": 34,
       "updatelogs": [
         {
           "version": "1.0.0",
@@ -52,6 +52,10 @@
         {
           "version": "1.6.9",
           "content": "修复历史页页脚溢出、删除记录后被旧快照覆盖、存档提示条数、版本戳重复与老数据兼容；比分写盘改为 250ms 合并"
+        },
+        {
+          "version": "1.7.0",
+          "content": "正式发布签名（不再使用调试证书）；作者信息绑定 AstroBox 账号；重做封面与预览图。"
         }
       ]
     }
