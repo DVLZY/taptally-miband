@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.8.1",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.8.1.rpk",
-      "versionCode": 40,
+      "version": "1.8.2",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.8.2.rpk",
+      "versionCode": 41,
       "updatelogs": [
+        {
+          "version": "1.8.2",
+          "content": "记分页卡片圆角 110→170px，与屏幕两端的胶囊弧度保持同心（170 = 屏幕圆角 240 − 边距 70）。"
+        },
         {
           "version": "1.8.1",
           "content": "动效改用不涉及几何的属性（底色/透明度），修掉点击时出现的竖线；页面进入动效延迟一帧再播，加长到 260ms。"

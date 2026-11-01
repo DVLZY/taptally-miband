@@ -502,25 +502,25 @@ export default {
   justify-content: center;
   border-width: 2px;
   /* 首帧兜底：数据绑定要等第一次渲染后才生效，这里先给最终值，避免"先直角后圆角"的闪一下。
-     110px ≈ 屏幕自身的圆角量级（屏宽 192 的圆角约 40px，换算设计宽 480 即 ~100） */
-  border-radius: 110px;
+     170px = 卡片半宽（圆屏分支下卡宽 340），圆角与屏幕两端的胶囊弧度一致 */
+  border-radius: 170px;
 }
 
 .cardTop {
   background-color: #7fd9b7;
   border-color: #9ff0d5;
-  border-radius: 110px;
+  border-radius: 170px;
 }
 
 .cardBot {
   background-color: #92cdf5;
   border-color: #bfe6ff;
-  border-radius: 110px;
+  border-radius: 170px;
 }
 
 /* 必须写在 .cardTop/.cardBot 之后：同为单类选择器，后写的才生效 */
 .rndPill {
-  border-radius: 110px;
+  border-radius: 170px;
 }
 
 .rndRect {
@@ -528,7 +528,7 @@ export default {
 }
 
 .rndCircle {
-  border-radius: 110px;
+  border-radius: 170px;
 }
 
 .mid {

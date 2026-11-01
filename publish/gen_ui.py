@@ -103,8 +103,8 @@ def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
     k = s.k
     d = s.d
     mid_fs = max(18, round(DH * 0.0196))
-    # 与 index.ux 保持一致：卡片圆角 110px（大于短边一半会被 Vela 夹到 240 变胶囊）
-    want = 110 if radius is None else radius
+    # 与 index.ux 保持一致：卡片圆角 170px（= 圆屏分支下的卡片半宽，与屏幕两端弧度一致）
+    want = 170 if radius is None else radius
     r = min(want, (min(card_w, card_h) / 2))
     y = pad * k
     for (val, bg, brd, ink, h) in ((top, CARD_T, CARD_T_B, INK_T, card_h),
@@ -312,7 +312,7 @@ def variants_pad():
 def variants():
     """圆角对比：卡片圆角越大，数字越容易被弧线切到。"""
     os.makedirs(OUT, exist_ok=True)
-    shots = [(110, "110px（约等于屏幕圆角）"), (160, "160px"), (200, "200px"), (300, "300px（现版本）")]
+    shots = [(110, "110px（1.8.1）"), (160, "160px"), (170, "170px（1.8.2）"), (300, "300px（等效胶囊）")]
     imgs = [(t, frame(score_screen(12, 9, radius=r))) for r, t in shots]
     cw = max(i.width for _, i in imgs)
     ch = max(i.height for _, i in imgs) + 64
