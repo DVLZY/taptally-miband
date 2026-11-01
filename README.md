@@ -5,7 +5,7 @@
 
 ![封面](media/cover.png)
 
-当前版本 **1.6.9** · 包名 `com.taptally.scoreboard` · [下载安装包](https://github.com/DVLZY/taptally-miband/releases/latest)
+当前版本 **1.7.0** · 包名 `com.taptally.scoreboard` · [下载安装包](https://github.com/DVLZY/taptally-miband/releases/latest)
 
 ---
 
@@ -88,6 +88,8 @@
 2. 「设备 → 安装队列」选择 `点记-<版本>.rpk`
 3. 覆盖安装即可
 
+> **从 1.7.0 起改用自签证书签名**，与之前用调试证书签的包签名不一致，覆盖安装会被拒。升级到 1.7.0 时先在手环上删掉「点记」，再装一次；之后同一张证书签名的版本可以正常覆盖。
+>
 > 换过图标后如果应用列表里没更新，先在手环上删掉「点记」再装一次 —— 图标有系统缓存。
 
 ---
