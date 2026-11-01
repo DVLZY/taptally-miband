@@ -6,14 +6,15 @@
     "description": "手环上的对局计分板：上下双色分区，单击 +1、长按 −1，带短震反馈；比分自动保存，退出重进不丢；上滑两次归零并存入记分列表（最近 5 局），右→左划查看历史，单击恢复、长按删除。\n适合台球、乒乓、羽毛球、棋牌等面对面对局。",
     "preview": [
       "media/preview-1.png",
-      "media/preview-2.png"
+      "media/preview-2.png",
+      "media/preview-3.png"
     ],
     "icon": "media/icon.png",
     "cover": "media/cover.png",
     "author": [
       {
-        "name": "DVLZY",
-        "author_url": "https://github.com/DVLZY"
+        "name": "丨长河落丨",
+        "bindABAccount": true
       }
     ]
   },
