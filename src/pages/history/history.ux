@@ -53,7 +53,7 @@ function metricsOf(w, h, shape) {
   if (shape === 'circle') pad = Math.round(dw * 0.1465)
   else if (shape === 'pill-shaped') pad = 18
   const itemH = Math.max(64, Math.min(150, Math.round(dh * 0.104)))
-  const noW = Math.round(itemH * 0.40)
+  const noW = Math.round(itemH * 0.46)
   const accentW = Math.max(6, Math.round(itemH * 0.075))
   const accentMl = Math.round(itemH * 0.06)
   const accentMr = Math.round(itemH * 0.20)
@@ -64,10 +64,10 @@ function metricsOf(w, h, shape) {
     itemH: itemH,
     barH: Math.round(itemH * 0.52),
     valFs: Math.round(itemH * 0.66),
-    noFs: Math.max(20, Math.round(itemH * 0.40)),
+    noFs: Math.max(24, Math.round(itemH * 0.52)),
     titleFs: Math.max(24, Math.round(dh * 0.036)),
     dbgFs: Math.max(40, Math.round(dh * 0.046)),
-    footFs: Math.max(26, Math.round(dh * 0.026)),
+    footFs: Math.max(30, Math.round(dh * 0.036)),
     accentW: accentW,
     accentMl: accentMl,
     accentMr: accentMr,
@@ -84,7 +84,7 @@ export default {
     itemH: 126,
     barH: 66,
     valFs: 83,
-    noFs: 50,
+    noFs: 66,
     titleFs: 44,
     dbgFs: 56,
     dbg: '',
@@ -92,9 +92,9 @@ export default {
     accentW: 9,
     accentMl: 8,
     accentMr: 25,
-    noW: 50,
+    noW: 58,
     valW: 300,
-    footFs: 30,
+    footFs: 44,
     devH: 0,
     foot: 'v' + APP_VERSION
   },

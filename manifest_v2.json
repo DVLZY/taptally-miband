@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.7.2",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.7.2.rpk",
-      "versionCode": 36,
+      "version": "1.7.3",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.7.3.rpk",
+      "versionCode": 37,
       "updatelogs": [
+        {
+          "version": "1.7.3",
+          "content": "记分列表序号与页脚字号放大（序号 0.40→0.52 行高、页脚约 13→18 物理像素）。"
+        },
         {
           "version": "1.7.2",
           "content": "记分页卡片圆角改为 110px，与屏幕圆角量级一致，数字不再被弧线切到。"

@@ -8,9 +8,9 @@
                  card radius 300（Vela 会夹到短边一半=240）cardW=480
                  mid 高=gap 字号=max(18, dh*0.0196)
     history.ux : pad=18 head 12% list 78% foot 10% itemH=max(64,min(150,dh*0.104))
-                 noW=itemH*0.40 accentW=itemH*0.075 accentMl=itemH*0.06 accentMr=itemH*0.20
-                 barH=itemH*0.52 valFs=itemH*0.66 noFs=itemH*0.40
-                 titleFs=dh*0.036 dbgFs=dh*0.046 footFs=dh*0.026
+                 noW=itemH*0.46 accentW=itemH*0.075 accentMl=itemH*0.06 accentMr=itemH*0.20
+                 barH=itemH*0.52 valFs=itemH*0.66 noFs=itemH*0.52
+                 titleFs=dh*0.036 dbgFs=dh*0.046 footFs=dh*0.036
 
 输出：
     publish/ui/sheet.png          8 个界面 + 边框的总览图
@@ -124,14 +124,14 @@ def history_metrics():
         "itemH": item_h,
         "barH": round(item_h * 0.52),
         "valFs": round(item_h * 0.66),
-        "noFs": max(20, round(item_h * 0.40)),
+        "noFs": max(24, round(item_h * 0.52)),
         "titleFs": max(24, round(DH * 0.036)),
         "dbgFs": max(40, round(DH * 0.046)),
-        "footFs": max(26, round(DH * 0.026)),
+        "footFs": max(30, round(DH * 0.036)),
         "accentW": max(6, round(item_h * 0.075)),
         "accentMl": round(item_h * 0.06),
         "accentMr": round(item_h * 0.20),
-        "noW": round(item_h * 0.40),
+        "noW": round(item_h * 0.46),
         "valW": DW - pad * 2 - round(item_h * 0.40) - max(6, round(item_h * 0.075))
                 - round(item_h * 0.06) - round(item_h * 0.20) - round(item_h * 0.08),
     }
