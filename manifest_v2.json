@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.7.7",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.7.7.rpk",
-      "versionCode": 41,
+      "version": "1.8.0",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.8.0.rpk",
+      "versionCode": 42,
       "updatelogs": [
+        {
+          "version": "1.8.0",
+          "content": "中缝加宽到 13% 并显示时间（小时十位与分钟个位大字号、逐字垂直居中）"
+        },
         {
           "version": "1.7.7",
           "content": "圆角加大后修正数字被弧线切到：字号按圆角内缩自动收敛（两位 384→360）。"

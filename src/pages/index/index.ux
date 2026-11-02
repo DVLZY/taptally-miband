@@ -4,7 +4,19 @@
       <text class="score scoreTop" style="font-size: {{fsTop}}px">{{top}}</text>
     </div>
     <div class="mid" style="height: {{gapH}}px" onlongpress="onMidLong">
-      <text class="midText" style="font-size: {{midFs}}px">{{mid}}</text>
+      <!-- 中缝时间：小时靠左、分钟靠右，无冒号；小时十位与分钟个位用大字号。
+           四个数字各自在自己的行盒里垂直居中，所以不会出现"踩在同一条基线"上 -->
+      <div class="clock" if="{{clockOn}}">
+        <div class="clockSide" style="margin-left: {{clockMargin}}px">
+          <text class="clockBig" style="font-size: {{clockBig}}px">{{h1}}</text>
+          <text class="clockSmall" style="font-size: {{clockSmall}}px">{{h2}}</text>
+        </div>
+        <div class="clockSide" style="margin-right: {{clockMargin}}px">
+          <text class="clockSmall" style="font-size: {{clockSmall}}px">{{m1}}</text>
+          <text class="clockBig" style="font-size: {{clockBig}}px">{{m2}}</text>
+        </div>
+      </div>
+      <text class="midText" if="{{mid}}" style="font-size: {{midFs}}px">{{mid}}</text>
     </div>
     <div class="card cardBot {{rCls}}" style="height: {{cardH2}}px" onclick="onBottom" onlongpress="onBottomLong">
       <text class="score scoreBot" style="font-size: {{fsBot}}px">{{bottom}}</text>
@@ -47,13 +59,19 @@ function metricsOf(w, h, shape) {
   // 手环9 的屏幕是胶囊形（屏宽 192 → 圆角半径 96 物理 = 240 设计像素），
   // 所以四角直接用 240px，两端弧线就跟屏幕边缘完全重合。
   const pad = 0
-  const gap = Math.round(dh * 0.04)
+  // 中缝高度：1.8.0 起从 4% 加宽到 13%，腾出空间放时间（见 docs/CHANGELOG）
+  const gap = Math.round(dh * 0.13)
   // 用整数像素分配高度，剩下的零头给下半区，保证两块+窄缝正好等于可用高度
   const usable = dh - pad * 2
   const cardH = Math.floor((usable - gap) / 2)
   const cardH2 = usable - gap - cardH
   const cardW = dw - pad * 2
-  return { dh: dh, pad: pad, gap: gap, cardH: cardH, cardH2: cardH2, cardW: cardW }
+  // 时钟字号按中缝高度推：手环9 上 gap=159 → 大 189 / 小 122，墨迹正好填满且上下留 6 设计像素
+  const clockBig = Math.max(24, Math.round(gap * 1.19))
+  const clockSmall = Math.max(16, Math.round(gap * 0.766))
+  const clockMargin = Math.max(6, Math.round(gap * 0.10))
+  return { dh: dh, pad: pad, gap: gap, cardH: cardH, cardH2: cardH2, cardW: cardW,
+           clockBig: clockBig, clockSmall: clockSmall, clockMargin: clockMargin }
 }
 
 export default {
@@ -69,7 +87,13 @@ export default {
     cardH2: 574,
     midFs: 24,
     mid: '',
-    armed: false
+    armed: false,
+    // 中缝时间：h1/h2 = 小时两位，m1/m2 = 分钟两位；clockOn=false 时整行不渲染
+    h1: '', h2: '', m1: '', m2: '',
+    clockOn: false,
+    clockBig: 189,
+    clockSmall: 122,
+    clockMargin: 16
   },
 
   onInit() {
@@ -87,7 +111,14 @@ export default {
     this.cardH = this.metrics.cardH
     this.cardH2 = this.metrics.cardH2
     this.rCls = 'rndPill'
-    this.midFs = Math.max(18, Math.round(this.metrics.dh * 0.0196))
+    this.midBigFs = Math.max(24, Math.round(this.metrics.gap * 0.30))
+    this.midSmallFs = Math.max(20, Math.round(this.metrics.gap * 0.21))
+    this.clockBig = this.metrics.clockBig
+    this.clockSmall = this.metrics.clockSmall
+    this.clockMargin = this.metrics.clockMargin
+    this.clockTimer = 0
+    this.clockOk = true      // Date 不可用时置 false，整行时间就不显示
+    this.midFs = this.midBigFs
     if (bootScore) {
       this.restored = true
       this.applyScore(bootScore.t, bootScore.b, false)
@@ -97,6 +128,7 @@ export default {
   onReady() {
     this.syncDevice()
     this.restore(false)
+    this.startClock()
     // 预热历史记录缓存：加记录时才能合并出完整历史，而不是覆盖成 1 条
     loadRecords(function () {})
   },
@@ -104,6 +136,7 @@ export default {
   // 从列表页返回时**一定**强制回读一次磁盘：列表页可能刚把另一局的比分写进去
   onShow() {
     const that = this
+    this.startClock()
     if (this.wasHidden) {
       this.wasHidden = false
       this.touched = false
@@ -118,12 +151,58 @@ export default {
   onHide() {
     this.wasHidden = true
     this.saveNow()
+    this.stopClock()
   },
 
   onDestroy() {
     this.saveNow()
     if (this.armTimer) clearTimeout(this.armTimer)
     if (this.midTimer) clearTimeout(this.midTimer)
+    this.stopClock()
+  },
+
+  // 中缝时间：HH ｜ MM，小时十位与分钟个位用大字号。
+  // 刷新对齐到「下一个整分钟」，而不是每 60 秒轮询——否则挂钟会越走越偏。
+  startClock() {
+    this.stopClock()
+    this.tickClock()
+  },
+
+  stopClock() {
+    if (this.clockTimer) {
+      clearTimeout(this.clockTimer)
+      this.clockTimer = 0
+    }
+  },
+
+  tickClock() {
+    const that = this
+    let hh = '--'
+    let mm = '--'
+    let delay = 60000
+    try {
+      const d = new Date()
+      const h = d.getHours()
+      const m = d.getMinutes()
+      hh = (h < 10 ? '0' : '') + h
+      mm = (m < 10 ? '0' : '') + m
+      // 下一次刷新的时刻：整分钟 + 一点点余量，避免还没跳到下一分钟就又刷了一次
+      delay = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 200
+      if (delay < 1000) delay = 1000
+    } catch (e) {
+      // 某些机型/固件不给 Date：这时不显示时间，绝不显示空行
+      that.clockOk = false
+      that.clockOn = false
+      return
+    }
+    this.h1 = hh.charAt(0)
+    this.h2 = hh.charAt(1)
+    this.m1 = mm.charAt(0)
+    this.m2 = mm.charAt(1)
+    this.clockOn = this.clockOk && this.mid === ''
+    this.clockTimer = setTimeout(function () {
+      that.tickClock()
+    }, delay)
   },
 
   // 中间横条长按：显示「屏幕参数 + 版本号 + 已存记录条数」
@@ -132,10 +211,12 @@ export default {
     const that = this
     this.buzz('short')
     loadRecords(function (list) {
+      const shape = (that.devShape || '?').replace('pill-shaped', 'pill').replace('circle', 'circ')
       that.showMid(
-        (that.devW || '?') + 'x' + (that.devH || '?') + ' ' + (that.devShape || '?') +
+        (that.devW || '?') + 'x' + (that.devH || '?') + ' ' + shape +
         ' v' + APP_VERSION + ' r' + (list ? list.length : 0),
-        4000
+        4000,
+        true
       )
     }, true)
   },
@@ -144,13 +225,16 @@ export default {
   // 注意：这里只能清自己的 midTimer。1.7.0 及以前用的是 armTimer，
   // 结果长按中缝看诊断时会把「再滑确认」的计时器清掉、armed 却还是 true，
   // 下一次上滑就被当成第二次确认直接归零。
-  showMid(text, ms) {
+  showMid(text, ms, small) {
     const that = this
+    this.midFs = small ? this.midSmallFs : this.midBigFs
     this.mid = text
+    this.clockOn = this.clockOk && text === ''   // 有提示文字时先让出位置
     if (this.midTimer) clearTimeout(this.midTimer)
     this.midTimer = setTimeout(function () {
       that.mid = ''
       that.midTimer = 0
+      that.clockOn = that.clockOk             // 提示消失，时间回来
     }, ms || 3000)
   },
 
@@ -179,7 +263,12 @@ export default {
     this.gapH = this.metrics.gap
     this.cardH = this.metrics.cardH
     this.cardH2 = this.metrics.cardH2
-    this.midFs = Math.max(18, Math.round(this.metrics.dh * 0.0196))
+    this.midBigFs = Math.max(24, Math.round(this.metrics.gap * 0.30))
+    this.midSmallFs = Math.max(20, Math.round(this.metrics.gap * 0.21))
+    this.clockBig = this.metrics.clockBig
+    this.clockSmall = this.metrics.clockSmall
+    this.clockMargin = this.metrics.clockMargin
+    this.midFs = this.midBigFs
     this.syncFont()
   },
 
@@ -484,9 +573,36 @@ export default {
 }
 
 .mid {
-  height: 4%;
+  height: 13%;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
+  /* 时钟字盒（font-size 189）比中缝（159）高，墨迹靠 align-items 居中；
+     必须允许溢出，否则上下会被裁掉一截 */
+  overflow: visible;
+}
+
+.clock {
+  width: 100%;
+  height: 100%;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clockSide {
+  flex-direction: row;
+  align-items: center;
+}
+
+.clockBig {
+  color: #eaf6f7;
+  font-weight: bold;
+}
+
+.clockSmall {
+  color: #cfe7ea;
+  font-weight: bold;
 }
 
 .midText {
