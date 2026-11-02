@@ -20,3 +20,4 @@ sign/
 
 # 界面渲染图（本地交付用，不入库）
 publish/ui/
+publish/__pycache__/

@@ -262,7 +262,7 @@
 ## 仓库整理（1.6.8 同期）
 
 - 删除一次性产物：`design/`（方案对比图与生成脚本）、`publish/` 下的图标对比/预览脚本与图片、`publish/index_row.csv`、`publish/__pycache__`
-- 只保留复用资产：`publish/gen_assets.py`（生成 icon/封面/预览）、`publish/make_submission.py`、`publish/发布说明.md`
+- 只保留复用资产：`publish/gen_assets.py`（生成 icon/封面/预览）、`publish/make_submission.py`、`docs/发布与分发.md`
 - `downloads/` 只保留当前 release 包；`manifest_v2.json` 升到 1.6.8
 
 ## 1.6.9（versionCode 33）— 代码自检版
