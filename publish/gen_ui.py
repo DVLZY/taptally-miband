@@ -16,6 +16,7 @@
     publish/ui/sheet.png          8 个界面 + 边框的总览图
     publish/ui/<name>.png         单张（3 倍图，576×1470 屏幕）
 """
+import math
 import os
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -81,20 +82,31 @@ def score_metrics(pad_override=None):
     # 真机实测（1.7.2 照片）：卡片左右各留约 12%~15% 屏宽的空白，
     # 说明 device.getInfo().screenShape 在这台手环上返回的是 circle，
     # 于是 metricsOf 走了圆屏分支：pad = round(dw * 0.1465)。
-    pad = round(DW * 0.1465) if pad_override is None else pad_override
-    gap = round(DH * 0.04)       # 49
+    # 1.7.6 起上下卡片贴边显示（pad=0），中缝 1.8.0 起加宽到 13% 放时间
+    pad = 0 if pad_override is None else pad_override
+    gap = round(DH * 0.13)       # 159
     usable = DH - pad * 2
     card_h = int((usable - gap) // 2)
     card_h2 = int(usable - gap - card_h)
     return pad, gap, card_h, card_h2, DW - pad * 2
 
 
-def size_for(n, card_h, card_w):
-    """与 index.ux 的 sizeFor 完全一致：按卡宽、卡高、430 三者取小。"""
+def size_for(n, card_h, card_w, r=240):
+    """与 index.ux 的 sizeFor 一致：卡宽 / 卡高 / 430 取小，并把圆角造成的宽度内缩算进去。"""
     digits = len(str(n))
-    by_w = card_w / (0.60 * digits) * 0.96
     by_h = card_h * 0.74
-    return max(24, round(min(by_w, by_h, 430)))
+    f = min(card_w / (0.60 * digits) * 0.96, by_h, 430)
+    for _ in range(3):
+        half_h = f * 0.36
+        straight = card_h / 2 - r
+        inset = 0.0
+        if half_h > straight:
+            kk = half_h - max(0, straight)
+            q = r * r - kk * kk
+            inset = r - (math.sqrt(q) if q > 0 else 0)
+        avail = card_w - 2 * inset
+        f = min(f, avail / (0.60 * digits) * 0.96, by_h, 430)
+    return max(24, round(f))
 
 
 def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
@@ -104,7 +116,7 @@ def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
     d = s.d
     mid_fs = max(18, round(DH * 0.0196))
     # 与 index.ux 保持一致：卡片圆角 170px（= 圆屏分支下的卡片半宽，与屏幕两端弧度一致）
-    want = 170 if radius is None else radius
+    want = 240 if radius is None else radius
     r = min(want, (min(card_w, card_h) / 2))
     y = pad * k
     for (val, bg, brd, ink, h) in ((top, CARD_T, CARD_T_B, INK_T, card_h),
@@ -113,15 +125,35 @@ def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
         fs = size_for(val, h, card_w)
         center_text(d, (pad * k, y, (pad + card_w) * k, y + h * k), str(val), font(FB, fs * k), ink)
         y += h * k + gap * k
+    y0 = pad * k + card_h * k
     if mid:
-        y0 = pad * k + card_h * k
         center_text(d, (0, y0, DW * k, y0 + gap * k), mid, font(FR, mid_fs * k), MID_INK)
+    else:
+        draw_clock(d, gap, y0, k)
     return s.finish()
 
 
 # ---------- 记分列表页 ----------
+def draw_clock(d, gap, y0, k, hh="21", mm="47"):
+    """中缝时间：小时靠左、分钟靠右，小时十位与分钟个位大字号，逐字按墨迹垂直居中。"""
+    big = round(gap * 1.19)
+    small = round(gap * 0.766)
+    margin = round(gap * 0.10)
+    fb, fs = font(FB, big * k), font(FB, small * k)
+    cy = y0 + gap * k / 2
+    for parts, anchor_x, align in (
+            ([(hh[0], fb), (hh[1], fs)], margin * k, "l"),
+            ([(mm[0], fs), (mm[1], fb)], (DW - margin) * k, "r")):
+        widths = [d.textlength(t, font=f) for t, f in parts]
+        x = anchor_x if align == "l" else anchor_x - sum(widths)
+        for (t, f), w in zip(parts, widths):
+            bb = d.textbbox((0, 0), t, font=f)
+            d.text((x, cy - (bb[1] + bb[3]) / 2), t, font=f, fill=(234, 246, 247), anchor="la")
+            x += w
+
+
 def history_metrics():
-    pad = round(DW * 0.1465)     # 70，与记分页同一个分支（circle）
+    pad = 18     # 真机 screenShape 报 pill-shaped，列表页用 18
     item_h = max(76, min(186, round(DH * 0.125)))
     return {
         "pad": pad,
