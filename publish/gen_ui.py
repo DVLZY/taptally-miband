@@ -114,7 +114,7 @@ def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
     s = Screen()
     k = s.k
     d = s.d
-    mid_fs = max(18, round(DH * 0.0196))
+    mid_fs = max(24, round(gap * 0.30))
     # 与 index.ux 保持一致：卡片圆角 170px（= 圆屏分支下的卡片半宽，与屏幕两端弧度一致）
     want = 240 if radius is None else radius
     r = min(want, (min(card_w, card_h) / 2))
@@ -123,7 +123,11 @@ def score_screen(top=0, bottom=0, mid="", radius=None, pad=None):
                                    (bottom, CARD_B, CARD_B_B, INK_B, card_h2)):
         rounded(d, [pad * k, y, (pad + card_w) * k, y + h * k], r * k, fill=bg, outline=brd, width=2 * k)
         fs = size_for(val, h, card_w)
-        center_text(d, (pad * k, y, (pad + card_w) * k, y + h * k), str(val), font(FB, fs * k), ink)
+        fnt = font(FB, fs * k)
+        bb = d.textbbox((0, 0), str(val), font=fnt)
+        cy = (y + y + h * k) / 2
+        d.text(((DW * k - d.textlength(str(val), font=fnt)) / 2, cy - (bb[1] + bb[3]) / 2),
+               str(val), font=fnt, fill=ink, anchor="la")
         y += h * k + gap * k
     y0 = pad * k + card_h * k
     if mid:

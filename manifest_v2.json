@@ -21,10 +21,14 @@
   "links": [],
   "downloads": {
     "xmb9": {
-      "version": "1.8.0",
-      "file_name": "downloads/com.taptally.scoreboard.release.1.8.0.rpk",
-      "versionCode": 42,
+      "version": "1.8.1",
+      "file_name": "downloads/com.taptally.scoreboard.release.1.8.1.rpk",
+      "versionCode": 43,
       "updatelogs": [
+        {
+          "version": "1.8.1",
+          "content": "上滑改为全行程手势，修掉拇指轻蹭就触发重置的误触"
+        },
         {
           "version": "1.8.0",
           "content": "中缝加宽到 13% 并显示时间（小时十位与分钟个位大字号、逐字垂直居中）"

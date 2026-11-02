@@ -118,6 +118,8 @@ export default {
     this.clockMargin = this.metrics.clockMargin
     this.clockTimer = 0
     this.clockOk = true      // Date 不可用时置 false，整行时间就不显示
+    this.lastG = ''          // 最近一次触摸的 s.y/e.y/dy，供长按中缝查看
+    this.dbgFlip = false
     this.midFs = this.midBigFs
     if (bootScore) {
       this.restored = true
@@ -210,6 +212,13 @@ export default {
   onMidLong() {
     const that = this
     this.buzz('short')
+    // 两页诊断：第一页设备信息，再长按一次切到「最近一次手势读数」。
+    // 手势改成全行程后要靠 s/e/dy 三个数确认阈值在这台机上合不合适。
+    this.dbgFlip = !this.dbgFlip
+    if (this.dbgFlip) {
+      this.showMid('g ' + (this.lastG || '-') + ' dh' + Math.round(this.metrics ? this.metrics.dh : 0), 4000, true)
+      return
+    }
     loadRecords(function (list) {
       const shape = (that.devShape || '?').replace('pill-shaped', 'pill').replace('circle', 'circ')
       that.showMid(
@@ -519,8 +528,21 @@ export default {
       }
       return
     }
-    // 上滑：重置（两次确认）
-    if (dy < -90) {
+    // 上滑：重置（两次确认）。
+    // 1.8.1 起改成「全行程」手势：必须从屏幕下方起手、真的划到上方才算，
+    // 否则拇指在屏幕上蹭一下（原来只要 90 设计像素 ≈ 36 物理像素）就会进确认。
+    // 阈值按屏高比例给，换机型自动适配（手环9：dh=1225 → 起点 ≥760 / 终点 ≤466 / 位移 ≥294）。
+    const dh = this.metrics ? this.metrics.dh : 1225
+    const dw = DESIGN_W
+    this.lastG = Math.round(start.y) + '/' + Math.round(end.y) + '/' + Math.round(dy)
+    // 阈值取整：1225*0.24 = 294.00000000000006，正好划到 294 会被浮点判成不达标
+    const fullSweep =
+      start.y >= Math.round(dh * 0.62) &&        // 起手必须在屏幕下方 38% 以内
+      end.y <= Math.round(dh * 0.38) &&          // 手指必须真的划到上方 38% 以内
+      dy <= -Math.round(dh * 0.24) &&            // 竖直行程至少 24% 屏高
+      Math.abs(dx) <= Math.round(dw * 0.30) &&   // 横向漂移不超过 30% 屏宽
+      Math.abs(dy) > Math.abs(dx) * 1.5          // 竖向为主
+    if (fullSweep) {
       this.resetFlow()
       return
     }
