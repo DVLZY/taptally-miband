@@ -4,8 +4,9 @@
 输出到 media/：
   icon.png        192x192  应用图标
   cover.png      1200x800  头图（3:2）
-  preview-1.png  1200x800  预览图 1（与头图同图）
-  preview-2.png   384x980  预览图 2（手环真实界面 192x490 的 2 倍图）
+  preview-1.png   384x980  预览图 1（记分页「再滑确认」状态）
+  preview-2.png   384x980  预览图 2（记分页 · 中缝时钟）
+  preview-3.png   384x980  预览图 3（记分列表页）
 另在 publish/ 输出 logo-512/256.png 备用的高清图标。
 """
 import math
@@ -184,10 +185,14 @@ def make_cover(W=1200, H=800):
     return img
 
 
-def make_screen(top="12", bottom="9", scale=2):
-    """手环真实界面 192×490 的 scale 倍图（记分页，含中缝时间）：界面由 gen_ui 渲染。"""
+def make_screen(top="12", bottom="9", scale=2, mid=None):
+    """手环真实界面 192×490 的 scale 倍图（记分页）：界面由 gen_ui 渲染。
+
+    不传 mid 时中缝显示时钟；传 `mid`（如「再滑确认」）时中缝改为提示文字，
+    用来出「上滑一次、等待二次确认」这一状态。
+    """
     from gen_ui import score_screen
-    return score_screen(int(top), int(bottom)).resize((192 * scale, 490 * scale), Image.LANCZOS)
+    return score_screen(int(top), int(bottom), mid or "").resize((192 * scale, 490 * scale), Image.LANCZOS)
 
 
 if __name__ == "__main__":
@@ -208,8 +213,11 @@ if __name__ == "__main__":
         print("wrote", p)
     cover = make_cover()
     cover.convert("RGB").save(os.path.join(MEDIA, "cover.png"))
-    cover.convert("RGB").save(os.path.join(MEDIA, "preview-1.png"))
-    print("wrote media/cover.png + preview-1.png", cover.size)
+    print("wrote media/cover.png", cover.size)
+    # preview-1 不再与封面重复：出「上滑一次 → 再滑确认」的状态，三张预览各看一页
+    armed = make_screen("12", "9", 2, mid="再滑确认")
+    armed.convert("RGB").save(os.path.join(MEDIA, "preview-1.png"))
+    print("wrote media/preview-1.png", armed.size)
     screen = make_screen("12", "9", 2)
     screen.convert("RGB").save(os.path.join(MEDIA, "preview-2.png"))
     print("wrote media/preview-2.png", screen.size)
