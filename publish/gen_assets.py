@@ -9,7 +9,6 @@
   preview-3.png   384x980  预览图 3（记分列表页）
 另在 publish/ 输出 logo-512/256.png 备用的高清图标。
 """
-import math
 import os
 from PIL import Image, ImageDraw, ImageFont
 
@@ -22,7 +21,6 @@ FONT_R = r"C:\Windows\Fonts\msyh.ttc"
 GREEN = (168, 230, 207, 255)
 GREEN_C = (109, 216, 176)   # 渐变上端（偏深的薄荷绿）
 BLUE_C = (146, 205, 245)    # 渐变下端（浅蓝）
-BLUE = (179, 229, 252, 255)
 DARK = (14, 20, 24, 255)
 GREEN_TXT = (11, 107, 79, 255)
 BLUE_TXT = (11, 79, 107, 255)
@@ -83,53 +81,6 @@ def make_logo(size, ss=4, digit_fs=0.576, stag=0.120, overlap=0.200, pad_ratio=0
         w, hh = bb[2] - bb[0], bb[3] - bb[1]
         d.text((S * cx - w / 2 - bb[0], S * cy - hh / 2 - bb[1]), txt, font=font, fill=color)
     return img.resize((size, size), Image.LANCZOS)
-
-
-def band_mock(W, H):
-    """手环屏幕示意：贴边两片卡片 + 圆角=半宽（与 App 的 240px 圆角一致）。"""
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    gap = max(2, int(H * 0.040))       # App: round(dh*0.04)
-    card_h = (H - gap) // 2            # App: (dh - gap) / 2，pad=0
-    r = W // 2                         # App: border-radius 240 ≈ 屏宽 480 的一半
-    top = [0, 0, W, card_h]
-    bot = [0, card_h + gap, W, H]
-    d.rounded_rectangle(top, radius=r, fill=GREEN)
-    d.rounded_rectangle(bot, radius=r, fill=BLUE)
-    for txt, box, color, n in (("12", top, GREEN_TXT, 2), ("9", bot, BLUE_TXT, 1)):
-        # 与 index.ux 的 sizeFor 同构：受卡宽/卡高/圆角内缩三者约束
-        fs = _size_for(n, card_h, W, W / 2.0)
-        font = ImageFont.truetype(FONT_B, int(fs * W / 480.0))
-        bb = d.textbbox((0, 0), txt, font=font)
-        w, h = bb[2] - bb[0], bb[3] - bb[1]
-        cx = (box[0] + box[2]) / 2 - w / 2 - bb[0]
-        cy = (box[1] + box[3]) / 2 - h / 2 - bb[1]
-        d.text((cx, cy), txt, font=font, fill=color)
-    # 屏幕是胶囊形：整体按胶囊裁一刀，卡片两端才会跟着收成屏幕的弧度
-    mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, W - 1, H - 1], radius=W // 2, fill=255)
-    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    out.paste(img, (0, 0), mask)
-    return out
-
-
-def _size_for(n, card_h, card_w, r):
-    """复刻 src/pages/index/index.ux 的 sizeFor（含圆角内缩迭代）。"""
-    import math
-    d = len(str(n))
-    by_h = card_h * 0.74
-    f = min(card_w / (0.60 * d) * 0.96, by_h, 430 * card_w / 480.0)
-    for _ in range(3):
-        half_h = f * 0.36
-        straight = card_h / 2 - r
-        inset = 0.0
-        if half_h > straight:
-            kk = half_h - max(0.0, straight)
-            q = r * r - kk * kk
-            inset = r - (math.sqrt(q) if q > 0 else 0.0)
-        avail = card_w - inset * 2
-        f = min(f, avail / (0.60 * d) * 0.96, by_h)
-    return max(24.0, f)
 
 
 def make_cover(W=1200, H=800):
