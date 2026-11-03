@@ -7,7 +7,7 @@
   preview-1.png   384x980  预览图 1（记分页「再滑确认」状态）
   preview-2.png   384x980  预览图 2（记分页 · 中缝时钟）
   preview-3.png   384x980  预览图 3（记分列表页）
-另在 publish/ 输出 logo-512/256.png 备用的高清图标。
+另在 publish/ 输出 logo-512/256.png 备用的高清图标（本地备用，不入库）。
 """
 import os
 from PIL import Image, ImageDraw, ImageFont

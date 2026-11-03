@@ -17,7 +17,7 @@
       </div>
     </scroll>
     <div class="foot">
-      <text class="footText" style="font-size: {{footFs}}px" onlongpress="onFootLong">{{foot}}</text>
+      <text class="footText" style="font-size: {{footFs}}px">{{foot}}</text>
     </div>
   </div>
 </template>
@@ -150,11 +150,6 @@ export default {
   },
 
   // 长按标题：切换标题下方的诊断行（S/F = 两通道读到的字符数，N = 内存条数）
-  // 长按页脚：进圆角试验页（临时排障用，确认 border-radius 在真机上的实际表现）
-  onFootLong() {
-    router.push({ uri: '/pages/probe' })
-  },
-
   onTitleLong() {
     const that = this
     this.buzz('short')

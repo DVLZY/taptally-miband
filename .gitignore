@@ -21,3 +21,5 @@ sign/
 # 界面渲染图（本地交付用，不入库）
 publish/ui/
 publish/__pycache__/
+# 每次 gen_assets 重出的备用高清图标
+publish/logo-*.png

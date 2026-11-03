@@ -46,9 +46,6 @@
       },
       "pages/history": {
         "component": "history"
-      },
-      "pages/probe": {
-        "component": "probe"
       }
     }
   }
