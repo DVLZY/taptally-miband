@@ -1,5 +1,15 @@
 # 更新记录
 
+## 仓库整理（2026-11-04，无版本变更）
+
+- 仓库只保留必要的代码与资源（提交 `d2905be`）：删除一次性对比脚本 `gen_cover.py` /
+  `gen_radius_style.py` / `gen_clock_style.py`、AstroBox 投稿生成器 `make_submission.py`、
+  圆角试验页 `pages/probe`（连带历史页页脚长按入口）、空配置 `src/config-watch.json`、
+  每次自动重出的 `publish/logo-512/256.png`，以及 `downloads/` 里与 Release 资产同 sha256
+  的 rpk 副本；`manifest_v2.json` 的 `file_name` 改指 GitHub Release 资产 URL。
+- 本次不改功能、不发新包：线上 1.8.1 包内容不变（其中仍含试验页）。下次构建前先把
+  `versionCode` 从 43 升到下一版本号，避免与已发布包同名。
+
 ## 1.8.1（versionCode 43）
 
 - **修复：上滑误触**。原来只判 `dy < -90`（90 设计像素 ≈ 36 物理像素 ≈ 屏高 7%），
